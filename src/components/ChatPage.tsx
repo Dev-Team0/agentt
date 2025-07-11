@@ -14,7 +14,7 @@ import { useRouter } from 'next/navigation';
 
 // Dynamically import the named Sidebar export
 const Sidebar = dynamic(
-  () => import('./Sidebar').then((mod) => mod.Sidebar),
+  () => import('./Sidebar').then(mod => mod.Sidebar),
   { ssr: false }
 );
 
@@ -24,113 +24,102 @@ export default function ChatPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState<string>('');
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
-  const [showSettings, setShowSettings] = useState<boolean>(false);
-  const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
-  const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const themeClasses = getThemeClasses(theme);
 
-  // Load theme from localStorage (client-only)
+  // Load saved theme
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const savedTheme = localStorage.getItem('vb-theme') as Theme;
-    if (savedTheme && ['light', 'dark', 'very-dark'].includes(savedTheme)) {
-      setTheme(savedTheme);
+    const t = localStorage.getItem('vb-theme') as Theme;
+    if (t && ['light', 'dark', 'very-dark'].includes(t)) {
+      setTheme(t);
     }
   }, []);
 
-  const handleThemeChange = (newTheme: Theme) => {
-    setTheme(newTheme);
+  const handleThemeChange = (t: Theme) => {
+    setTheme(t);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('vb-theme', newTheme);
+      localStorage.setItem('vb-theme', t);
     }
   };
 
   // Auth check
   useEffect(() => {
-    async function checkAuth() {
+    (async () => {
       try {
-        const res = await fetch('/api/auth-check');
-        if (res.status === 401) {
-          localStorage.setItem('auth', 'false');
-          router.replace('/');
-          return;
-        }
+        const r = await fetch('/api/auth-check');
+        if (r.status === 401) throw new Error();
       } catch {
-        localStorage.setItem('auth', 'false');
+        if (typeof window !== 'undefined') localStorage.setItem('auth', 'false');
         router.replace('/');
         return;
       }
       setIsAuthChecking(false);
-    }
-    checkAuth();
+    })();
   }, [router]);
 
   // Admin flag
   useEffect(() => {
-    async function checkAdmin() {
-      try {
-        const res = await fetch('/api/check-admin');
-        const data = await res.json();
-        setIsAdmin(data.isAdmin);
-      } catch {
-        setIsAdmin(false);
-      }
-    }
-    checkAdmin();
+    fetch('/api/check-admin')
+      .then(r => r.json())
+      .then(d => setIsAdmin(d.isAdmin))
+      .catch(() => setIsAdmin(false));
   }, []);
 
   // Sync logout across tabs
   useEffect(() => {
-    const handleStorage = (e: StorageEvent) => {
+    const onStorage = (e: StorageEvent) => {
       if (e.key === 'auth' && e.newValue === 'false') {
         router.replace('/');
       }
     };
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
   }, [router]);
 
   // Load conversations
   useEffect(() => {
-    async function load() {
-      const res = await fetch('/api/conversations');
-      if (res.ok) {
-        const data = await res.json();
+    (async () => {
+      const r = await fetch('/api/conversations');
+      if (r.ok) {
+        const data: Conversation[] = await r.json();
         setConversations(data);
-        if (data.length > 0) {
+        if (data.length) {
           setCurrentConversationId(data[0].id);
           setMessages(data[0].messages || []);
         }
       }
-    }
-    load();
+    })();
   }, []);
 
-  // Scroll to bottom on messages change
+  // Scroll in desktop only
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages]);
 
-  // Focus input whenever messages or loading state changes
+  // Focus input after send
   useEffect(() => {
-    const timer = setTimeout(() => inputRef.current?.focus(), 100);
-    return () => clearTimeout(timer);
+    const t = setTimeout(() => inputRef.current?.focus(), 100);
+    return () => clearTimeout(t);
   }, [messages, isLoading]);
 
-  // Helpers
-  const generateConversationTitle = (text: string) => {
-    const snippet = text.split(' ').slice(0, 4).join(' ');
-    return snippet.length > 30 ? snippet.slice(0, 30) + '…' : snippet;
+  const genTitle = (txt: string) => {
+    const s = txt.split(' ').slice(0, 4).join(' ');
+    return s.length > 30 ? s.slice(0, 30) + '…' : s;
   };
 
   // Conversation handlers
-  const createNewConversation = () => {
+  const createNew = () => {
     setCurrentConversationId(null);
     setMessages([
       {
@@ -142,118 +131,113 @@ export default function ChatPage() {
     setSidebarOpen(false);
   };
 
-  const selectConversation = (id: string) => {
-    const conv = conversations.find((c) => c.id === id);
-    if (conv) {
+  const selectConv = (id: string) => {
+    const c = conversations.find(x => x.id === id);
+    if (c) {
       setCurrentConversationId(id);
-      setMessages(conv.messages);
+      setMessages(c.messages);
       setSidebarOpen(false);
     }
   };
 
-  const updateConversationMessages = (id: string, newMessages: Message[]) => {
-    setConversations((prev) =>
-      prev.map((conv) =>
-        conv.id === id ? { ...conv, messages: newMessages, time: 'Just now' } : conv
-      )
+  const updateMsgs = (id: string, msgs: Message[]) => {
+    setConversations(prev =>
+      prev.map(c => (c.id === id ? { ...c, messages: msgs, time: 'Just now' } : c))
     );
   };
 
-  const sendFeedback = (msg: Message, fb: 'helpful' | 'not-helpful') => {
-    console.log(`Feedback: ${fb}`, msg);
+  const sendFB = (msg: Message, fb: 'helpful' | 'not-helpful') => {
+    console.log(`Feedback ${fb}`, msg);
   };
 
-  // Send message (with optional file upload)
+  // Send message + optional file upload
   const sendMessage = async (overrideText?: string, file?: File) => {
-    const text = overrideText ?? input;
-    if (!text.trim() && !file) return;
+    const txt = overrideText ?? input;
+    if (!txt.trim() && !file) return;
 
-    const userMessage: Message = {
+    const userMsg: Message = {
       role: 'user',
       content: file
-        ? `📎 Uploaded file: ${file.name}${text ? `\n\n${text}` : ''}`
-        : text,
+        ? `📎 Uploaded file: ${file.name}${txt ? `\n\n${txt}` : ''}`
+        : txt,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
-    // Handle file if one was selected
     if (file) {
-      const form = new FormData();
-      form.append('file', file);
-      const upl = await fetch('/api/upload', { method: 'POST', body: form });
-      const { url } = await upl.json();
-      userMessage.content = `[file:${file.name}](${url})${text ? `\n\n${text}` : ''}`;
+      const fd = new FormData();
+      fd.append('file', file);
+      const up = await fetch('/api/upload', { method: 'POST', body: fd });
+      const { url } = await up.json();
+      userMsg.content = `[file:${file.name}](${url})${txt ? `\n\n${txt}` : ''}`;
     }
 
-    // Optimistically update UI
-    const newMessages = [...messages, userMessage];
-    setMessages(newMessages);
+    const newMsgs = [...messages, userMsg];
+    setMessages(newMsgs);
     setInput('');
     setIsLoading(true);
 
-    let finalMessages = newMessages;
+    let final = newMsgs;
     try {
-      const res = await fetch('/api/chat', {
+      const r = await fetch('/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${process.env.NEXT_PUBLIC_VB_API_KEY}`,
         },
-        body: JSON.stringify({ messages: newMessages }),
+        body: JSON.stringify({ messages: newMsgs }),
       });
-
-      if (!res.ok) throw new Error(await res.text());
-      const { content } = await res.json();
-      const aiMessage: Message = {
+      if (!r.ok) throw new Error(await r.text());
+      const { content } = await r.json();
+      const aiMsg: Message = {
         role: 'assistant',
         content,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
-      finalMessages = [...newMessages, aiMessage];
-      setMessages(finalMessages);
-    } catch (err) {
-      console.error('Chat error:', err);
-      finalMessages = [
-        ...newMessages,
+      final = [...newMsgs, aiMsg];
+      setMessages(final);
+    } catch (e) {
+      console.error(e);
+      final = [
+        ...newMsgs,
         {
           role: 'assistant',
           content: 'Sorry, something went wrong.',
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
       ];
-      setMessages(finalMessages);
+      setMessages(final);
     }
 
     // Persist conversation
     try {
-      const title = generateConversationTitle(text);
+      const title = genTitle(txt);
       if (currentConversationId) {
         await fetch('/api/conversations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: currentConversationId, title, messages: finalMessages }),
+          body: JSON.stringify({ id: currentConversationId, title, messages: final }),
         });
-        updateConversationMessages(currentConversationId, finalMessages);
+        updateMsgs(currentConversationId, final);
       } else {
-        const createRes = await fetch('/api/conversations', {
+        const r2 = await fetch('/api/conversations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title, messages: finalMessages }),
+          body: JSON.stringify({ title, messages: final }),
         });
-        const { id } = await createRes.json();
+        const { id } = await r2.json();
         setCurrentConversationId(id);
         const all = await fetch('/api/conversations');
         if (all.ok) setConversations(await all.json());
       }
     } catch (e) {
-      console.error('Save error:', e);
+      console.error(e);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Logout handler
-  const handleLogout = async () => {
+  // Logout
+  const logout = async () => {
     await fetch('/api/logout', { method: 'POST' });
     if (typeof window !== 'undefined') {
       localStorage.setItem('auth', 'false');
@@ -262,11 +246,11 @@ export default function ChatPage() {
     router.replace('/');
   };
 
-  // Delete conversation
-  const handleDeleteConversation = async (id: string) => {
-    const res = await fetch(`/api/conversations/${id}`, { method: 'DELETE' });
-    if (res.ok) {
-      setConversations((prev) => prev.filter((c) => c.id !== id));
+  // Delete conv
+  const deleteConv = async (id: string) => {
+    const r = await fetch(`/api/conversations/${id}`, { method: 'DELETE' });
+    if (r.ok) {
+      setConversations(prev => prev.filter(x => x.id !== id));
       if (currentConversationId === id) {
         setCurrentConversationId(null);
         setMessages([]);
@@ -286,21 +270,21 @@ export default function ChatPage() {
   }
 
   return (
-    <div className={`flex h-screen flex-col md:flex-row ${themeClasses.bg}`}>
-      {/* Sidebar (mobile overlay, desktop static) */}
+    <div className={`flex h-screen flex-col md:flex-row ${themeClasses.bg} overflow-hidden`}>
+      {/* Sidebar */}
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         conversations={conversations}
-        onNewConversation={createNewConversation}
-        onSelectConversation={selectConversation}
-        onDeleteConversation={handleDeleteConversation}
+        onNewConversation={createNew}
+        onSelectConversation={selectConv}
+        onDeleteConversation={deleteConv}
         currentConversationId={currentConversationId}
         onShowSettings={() => setShowSettings(true)}
         theme={theme}
       />
 
-      {/* Settings modal */}
+      {/* Settings */}
       <SettingsModal
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
@@ -310,117 +294,87 @@ export default function ChatPage() {
 
       {/* Main chat area */}
       <div className="flex flex-1 flex-col min-w-0">
-        {/* Header */}
-        <header className={`flex items-center justify-between px-4 py-3 border-b shadow-sm ${themeClasses.cardBg} ${themeClasses.border}`}>
-          <div className="flex items-center gap-3">
-            <button className="md:hidden p-2" onClick={() => setSidebarOpen(true)}>
+        <header className={`flex items-center justify-between px-4 py-2 border-b shadow-sm ${themeClasses.cardBg} ${themeClasses.border}`}>
+          <div className="flex items-center gap-2">
+            <button className="md:hidden p-1" onClick={() => setSidebarOpen(true)}>
               <Menu className={`w-5 h-5 ${themeClasses.textMuted}`} />
             </button>
             <SafeImage
               src="/vb.png"
-              alt="VB Capital"
-              className="w-8 h-6"
+              alt="VB"
+              className="w-7 h-5"
               theme={theme}
               fallback={<Building2 className={`w-5 h-5 ${themeClasses.textMuted}`} />}
             />
-            <div>
-              <h1 className={`font-semibold text-lg ${themeClasses.text}`}>VB Capital Assistant</h1>
-              <div className="text-sm text-green-600 flex items-center gap-1">
-                <span className="w-2 h-2 bg-green-500 rounded-full" />
-                Online
-              </div>
-            </div>
+            <h1 className={`font-semibold text-base ${themeClasses.text}`}>VB Capital Assistant</h1>
           </div>
           <div className="flex items-center gap-2">
             {isAdmin && (
               <button
                 onClick={() => router.push('/admin')}
-                className={`hidden md:inline-block text-sm px-3 py-1 rounded-lg ${themeClasses.buttonSecondary} ${themeClasses.text}`}
+                className={`text-xs px-2 py-1 rounded ${themeClasses.buttonSecondary} ${themeClasses.text}`}
               >
                 Admin
               </button>
             )}
-            <button
-              onClick={handleLogout}
-              className="text-sm px-3 py-1 rounded-lg bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white flex items-center gap-1"
-            >
-              <LogOut className="w-4 h-4" /> Logout
+            <button onClick={logout} className="p-1 rounded bg-emerald-600 text-white">
+              <LogOut className="w-4 h-4" />
             </button>
           </div>
         </header>
 
-        {/* Messages list */}
-        <main className="flex-1 overflow-y-auto p-4">
-          <div className="mx-auto w-full max-w-xl space-y-4">
-            {messages.map((msg, i) => (
-              <ChatMessage
-                key={i}
-                message={msg}
-                theme={theme}
-                onFeedback={msg.role === 'assistant' ? sendFeedback : undefined}
-              />
-            ))}
-            {isLoading && <TypingIndicator theme={theme} />}
-            <div ref={messagesEndRef} />
-          </div>
+        {/* Messages (desktop scroll) */}
+        <main className={`flex-1 ${themeClasses.text} md:overflow-auto p-2`}>
+          {messages.map((m, i) => (
+            <ChatMessage key={i} message={m} theme={theme} onFeedback={m.role === 'assistant' ? sendFB : undefined} />
+          ))}
+          {isLoading && <TypingIndicator theme={theme} />}
+          <div ref={messagesEndRef} />
         </main>
 
-        {/* Input section */}
-        <footer className={`border-t px-4 py-3 ${themeClasses.cardBg} ${themeClasses.border}`}>
-          <div className="mx-auto max-w-xl space-y-2">
-            {messages.length <= 1 && (
-              <QuestionSuggestions
-                onSelectQuestion={sendMessage}
-                conversations={conversations}
-                theme={theme}
-              />
-            )}
-            <div className="flex items-end gap-2">
-              <textarea
-                ref={inputRef}
-                className={`flex-1 resize-none rounded-2xl border p-3 focus:outline-none transition-colors ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.text}`}
-                rows={1}
-                placeholder="Type your message…"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) =>
-                  e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), sendMessage())
+        {/* Input & footer */}
+        <footer className={`border-t px-4 py-2 flex flex-col gap-1 ${themeClasses.cardBg} ${themeClasses.border}`}>
+          {messages.length <= 1 && (
+            <QuestionSuggestions onSelectQuestion={sendMessage} conversations={conversations} theme={theme} />
+          )}
+          <div className="flex items-center gap-2">
+            <textarea
+              ref={inputRef}
+              className={`flex-1 resize-none rounded border p-2 text-sm focus:outline-none transition-colors ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.text}`}
+              placeholder="Type your message... (Press Enter to send)"
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), sendMessage())}
+              disabled={isLoading}
+              rows={1}
+            />
+            <input
+              id="file"
+              type="file"
+              accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+              className="hidden"
+              onChange={e => {
+                const f = e.target.files?.[0];
+                if (f) {
+                  sendMessage(undefined, f);
+                  e.currentTarget.value = '';
                 }
-                disabled={isLoading}
-                style={{ maxHeight: '120px' }}
-              />
-              <input
-                type="file"
-                id="fileUpload"
-                accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    sendMessage(undefined, file);
-                    e.currentTarget.value = '';
-                  }
-                }}
-                className="hidden"
-              />
-              <label
-                htmlFor="fileUpload"
-                className="cursor-pointer text-emerald-500 hover:text-emerald-600"
-                title="Upload file"
-              >
-                📎
-              </label>
-              <button
-                onClick={() => sendMessage()}
-                disabled={!input.trim() || isLoading}
-                className="rounded-full p-3 bg-gradient-to-r from-emerald-500 to-emerald-600 disabled:opacity-50 text-white"
-              >
-                <Send className="w-5 h-5" />
-              </button>
-            </div>
-            <p className={`text-center text-xs ${themeClasses.textMuted}`}>
-              You can upload PDF, Word, or images for the AI to read and respond.
-            </p>
+              }}
+            />
+            <label htmlFor="file" className="text-xl cursor-pointer text-emerald-500" title="Upload file">
+              📎
+            </label>
+            <button
+              onClick={() => sendMessage()}
+              disabled={!input.trim() || isLoading}
+              className="p-2 rounded bg-emerald-600 text-white"
+            >
+              <Send className="w-5 h-5" />
+            </button>
           </div>
+          <p className={`text-center text-xs ${themeClasses.textMuted}`}>
+            You can upload files like PDF, Word, or images for the AI to read and respond.
+          </p>
         </footer>
       </div>
     </div>
