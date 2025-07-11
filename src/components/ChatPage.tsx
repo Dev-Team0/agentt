@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { Send, Menu, Building2, LogOut } from 'lucide-react';
 import { Conversation, Message, Theme } from '@/lib/types';
