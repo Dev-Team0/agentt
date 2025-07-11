@@ -1,17 +1,22 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { Send, Menu, Building2, LogOut } from 'lucide-react';
 import { Conversation, Message, Theme } from '@/lib/types';
 import { SafeImage } from '@/components/ui/SafeImage';
 import { getThemeClasses } from '@/lib/theme';
-import { Sidebar } from './Sidebar';
 import { SettingsModal } from './SettingsModal';
 import { QuestionSuggestions } from './QuestionSuggestions';
 import { ChatMessage } from './ChatMessage';
 import { TypingIndicator } from './TypingIndicator';
 import { useRouter } from 'next/navigation';
-import React from 'react';
+
+// Dynamically import the named Sidebar export
+const Sidebar = dynamic(
+  () => import('./Sidebar').then((mod) => mod.Sidebar),
+  { ssr: false }
+);
 
 export default function ChatPage() {
   const router = useRouter();
@@ -30,42 +35,45 @@ export default function ChatPage() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const themeClasses = getThemeClasses(theme);
 
-  // Load theme from localStorage on component mount
+  // Load theme from localStorage (client-only)
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     const savedTheme = localStorage.getItem('vb-theme') as Theme;
     if (savedTheme && ['light', 'dark', 'very-dark'].includes(savedTheme)) {
       setTheme(savedTheme);
     }
   }, []);
 
-  // Save theme to localStorage whenever it changes
   const handleThemeChange = (newTheme: Theme) => {
     setTheme(newTheme);
-    localStorage.setItem('vb-theme', newTheme);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('vb-theme', newTheme);
+    }
   };
 
+  // Auth check
   useEffect(() => {
-    const checkAuth = async () => {
-      setIsAuthChecking(true);
+    async function checkAuth() {
       try {
         const res = await fetch('/api/auth-check');
         if (res.status === 401) {
           localStorage.setItem('auth', 'false');
-          router.push('/');
+          router.replace('/');
           return;
         }
       } catch {
         localStorage.setItem('auth', 'false');
-        router.push('/');
+        router.replace('/');
         return;
       }
       setIsAuthChecking(false);
-    };
+    }
     checkAuth();
   }, [router]);
 
+  // Admin flag
   useEffect(() => {
-    const checkAdmin = async () => {
+    async function checkAdmin() {
       try {
         const res = await fetch('/api/check-admin');
         const data = await res.json();
@@ -73,58 +81,61 @@ export default function ChatPage() {
       } catch {
         setIsAdmin(false);
       }
-    };
+    }
     checkAdmin();
   }, []);
 
+  // Sync logout across tabs
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
       if (e.key === 'auth' && e.newValue === 'false') {
-        router.push('/');
+        router.replace('/');
       }
     };
     window.addEventListener('storage', handleStorage);
     return () => window.removeEventListener('storage', handleStorage);
   }, [router]);
 
+  // Load conversations
   useEffect(() => {
-    const loadConversations = async () => {
+    async function load() {
       const res = await fetch('/api/conversations');
       if (res.ok) {
         const data = await res.json();
         setConversations(data);
         if (data.length > 0) {
-          const last = data[0];
-          setCurrentConversationId(last.id);
-          setMessages(last.messages || []);
+          setCurrentConversationId(data[0].id);
+          setMessages(data[0].messages || []);
         }
       }
-    };
-    loadConversations();
+    }
+    load();
   }, []);
 
+  // Scroll to bottom on messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Focus input whenever messages or loading state changes
   useEffect(() => {
-    const timer = setTimeout(() => {
-      inputRef.current?.focus();
-    }, 100);
+    const timer = setTimeout(() => inputRef.current?.focus(), 100);
     return () => clearTimeout(timer);
   }, [messages, isLoading]);
 
+  // Helpers
   const generateConversationTitle = (text: string) => {
-    const words = text.split(' ').slice(0, 4).join(' ');
-    return words.length > 30 ? words.substring(0, 30) + '...' : words;
+    const snippet = text.split(' ').slice(0, 4).join(' ');
+    return snippet.length > 30 ? snippet.slice(0, 30) + '…' : snippet;
   };
 
+  // Conversation handlers
   const createNewConversation = () => {
     setCurrentConversationId(null);
     setMessages([
       {
         role: 'assistant',
-        content: "Hello! I'm your VB Capital AI Assistant. I can help with investment analysis, portfolio insights, and market trends. How can I assist you today?",
+        content: "Hello! I'm your VB Capital AI Assistant. How can I assist you today?",
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       },
     ]);
@@ -149,38 +160,38 @@ export default function ChatPage() {
   };
 
   const sendFeedback = (msg: Message, fb: 'helpful' | 'not-helpful') => {
-    console.log(`Feedback: ${fb} for message:`, msg);
+    console.log(`Feedback: ${fb}`, msg);
   };
 
-  const sendMessage = async (messageText?: string, file?: File): Promise<void> => {
-    const text = messageText || input;
+  // Send message (with optional file upload)
+  const sendMessage = async (overrideText?: string, file?: File) => {
+    const text = overrideText ?? input;
     if (!text.trim() && !file) return;
 
     const userMessage: Message = {
       role: 'user',
-      content: file ? `📎 Uploaded file: ${file.name}${text ? `\n\n${text}` : ''}` : text,
+      content: file
+        ? `📎 Uploaded file: ${file.name}${text ? `\n\n${text}` : ''}`
+        : text,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
+    // Handle file if one was selected
     if (file) {
-      const formData = new FormData();
-      formData.append('file', file);
-      const uploadRes = await fetch('/api/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      const uploadData = await uploadRes.json();
-      userMessage.content = `[file:${file.name}](${uploadData.url})${text ? `\n\n${text}` : ''}`;
+      const form = new FormData();
+      form.append('file', file);
+      const upl = await fetch('/api/upload', { method: 'POST', body: form });
+      const { url } = await upl.json();
+      userMessage.content = `[file:${file.name}](${url})${text ? `\n\n${text}` : ''}`;
     }
 
+    // Optimistically update UI
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
     setInput('');
     setIsLoading(true);
 
-    const title = generateConversationTitle(text);
-    let finalMessages = [...newMessages];
-
+    let finalMessages = newMessages;
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -191,34 +202,31 @@ export default function ChatPage() {
         body: JSON.stringify({ messages: newMessages }),
       });
 
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error('Chat API error response:', errorText);
-        throw new Error('Failed to get AI response');
-      }
-
-      const data: { content: string } = await res.json();
-
+      if (!res.ok) throw new Error(await res.text());
+      const { content } = await res.json();
       const aiMessage: Message = {
         role: 'assistant',
-        content: data.content,
+        content,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
-
       finalMessages = [...newMessages, aiMessage];
       setMessages(finalMessages);
     } catch (err) {
       console.error('Chat error:', err);
-      const errorMessage: Message = {
-        role: 'assistant',
-        content: 'Sorry, I encountered an error processing your request.',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      };
-      finalMessages = [...newMessages, errorMessage];
+      finalMessages = [
+        ...newMessages,
+        {
+          role: 'assistant',
+          content: 'Sorry, something went wrong.',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        },
+      ];
       setMessages(finalMessages);
     }
 
+    // Persist conversation
     try {
+      const title = generateConversationTitle(text);
       if (currentConversationId) {
         await fetch('/api/conversations', {
           method: 'POST',
@@ -227,43 +235,38 @@ export default function ChatPage() {
         });
         updateConversationMessages(currentConversationId, finalMessages);
       } else {
-        const result = await fetch('/api/conversations', {
+        const createRes = await fetch('/api/conversations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title, messages: finalMessages }),
         });
-        const resultData = await result.json();
-        if (resultData?.id) {
-          setCurrentConversationId(resultData.id);
-          const updated = await fetch('/api/conversations');
-          if (updated.ok) {
-            const conversationsData = await updated.json();
-            setConversations(conversationsData);
-          }
-        }
+        const { id } = await createRes.json();
+        setCurrentConversationId(id);
+        const all = await fetch('/api/conversations');
+        if (all.ok) setConversations(await all.json());
       }
-    } catch (saveError) {
-      console.error('Failed to save conversation:', saveError);
+    } catch (e) {
+      console.error('Save error:', e);
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Logout handler
   const handleLogout = async () => {
-    try {
-      await fetch('/api/logout', { method: 'POST' });
+    await fetch('/api/logout', { method: 'POST' });
+    if (typeof window !== 'undefined') {
       localStorage.setItem('auth', 'false');
       window.dispatchEvent(new Event('storage'));
-      router.push('/');
-    } catch (err) {
-      console.error('Logout failed:', err);
     }
+    router.replace('/');
   };
 
+  // Delete conversation
   const handleDeleteConversation = async (id: string) => {
     const res = await fetch(`/api/conversations/${id}`, { method: 'DELETE' });
     if (res.ok) {
-      setConversations((prev) => prev.filter((conv) => conv.id !== id));
+      setConversations((prev) => prev.filter((c) => c.id !== id));
       if (currentConversationId === id) {
         setCurrentConversationId(null);
         setMessages([]);
@@ -275,7 +278,7 @@ export default function ChatPage() {
     return (
       <div className={`flex items-center justify-center h-screen ${themeClasses.bg} ${themeClasses.text}`}>
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto mb-4" />
           <p>Loading...</p>
         </div>
       </div>
@@ -283,7 +286,8 @@ export default function ChatPage() {
   }
 
   return (
-    <div className={`h-screen flex ${themeClasses.bg}`}>
+    <div className={`flex h-screen flex-col md:flex-row ${themeClasses.bg}`}>
+      {/* Sidebar (mobile overlay, desktop static) */}
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
@@ -296,6 +300,7 @@ export default function ChatPage() {
         theme={theme}
       />
 
+      {/* Settings modal */}
       <SettingsModal
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
@@ -303,31 +308,26 @@ export default function ChatPage() {
         onThemeChange={handleThemeChange}
       />
 
-      <div className="flex-1 flex flex-col min-w-0">
+      {/* Main chat area */}
+      <div className="flex flex-1 flex-col min-w-0">
         {/* Header */}
-        <header className={`border-b px-6 py-4 flex items-center justify-between shadow-sm ${themeClasses.cardBg} ${themeClasses.border}`}>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className={`p-2 rounded-lg transition-colors ${themeClasses.hoverSecondary} ${themeClasses.focus}`}
-              type="button"
-            >
+        <header className={`flex items-center justify-between px-4 py-3 border-b shadow-sm ${themeClasses.cardBg} ${themeClasses.border}`}>
+          <div className="flex items-center gap-3">
+            <button className="md:hidden p-2" onClick={() => setSidebarOpen(true)}>
               <Menu className={`w-5 h-5 ${themeClasses.textMuted}`} />
             </button>
-            <div className="flex items-center gap-3">
-              <SafeImage
-                src="/vb.png"
-                alt="VB Capital"
-                className="w-9 h-7"
-                theme={theme}
-                fallback={<Building2 className={`w-5 h-5 ${themeClasses.textMuted}`} />}
-              />
-              <div>
-                <h1 className={`font-semibold ${themeClasses.text}`}>VB Capital Assistant</h1>
-                <div className="text-sm text-green-600 flex items-center gap-1">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  Online
-                </div>
+            <SafeImage
+              src="/vb.png"
+              alt="VB Capital"
+              className="w-8 h-6"
+              theme={theme}
+              fallback={<Building2 className={`w-5 h-5 ${themeClasses.textMuted}`} />}
+            />
+            <div>
+              <h1 className={`font-semibold text-lg ${themeClasses.text}`}>VB Capital Assistant</h1>
+              <div className="text-sm text-green-600 flex items-center gap-1">
+                <span className="w-2 h-2 bg-green-500 rounded-full" />
+                Online
               </div>
             </div>
           </div>
@@ -335,23 +335,23 @@ export default function ChatPage() {
             {isAdmin && (
               <button
                 onClick={() => router.push('/admin')}
-                className={`text-sm px-4 py-2 rounded-lg transition-colors ${themeClasses.buttonSecondary} ${themeClasses.text}`}
+                className={`hidden md:inline-block text-sm px-3 py-1 rounded-lg ${themeClasses.buttonSecondary} ${themeClasses.text}`}
               >
                 Admin
               </button>
             )}
             <button
               onClick={handleLogout}
-              className="text-sm px-4 py-2 rounded-lg bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white flex items-center gap-2 transition-colors shadow"
+              className="text-sm px-3 py-1 rounded-lg bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white flex items-center gap-1"
             >
               <LogOut className="w-4 h-4" /> Logout
             </button>
           </div>
         </header>
 
-        {/* Main Content */}
-        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-0">
-          <div className="max-w-4xl mx-auto">
+        {/* Messages list */}
+        <main className="flex-1 overflow-y-auto p-4">
+          <div className="mx-auto w-full max-w-xl space-y-4">
             {messages.map((msg, i) => (
               <ChatMessage
                 key={i}
@@ -363,11 +363,11 @@ export default function ChatPage() {
             {isLoading && <TypingIndicator theme={theme} />}
             <div ref={messagesEndRef} />
           </div>
-        </div>
+        </main>
 
-        {/* Chat Input Section */}
-        <div className={`border-t px-6 py-4 ${themeClasses.cardBg} ${themeClasses.border}`}>
-          <div className="max-w-4xl mx-auto">
+        {/* Input section */}
+        <footer className={`border-t px-4 py-3 ${themeClasses.cardBg} ${themeClasses.border}`}>
+          <div className="mx-auto max-w-xl space-y-2">
             {messages.length <= 1 && (
               <QuestionSuggestions
                 onSelectQuestion={sendMessage}
@@ -375,59 +375,53 @@ export default function ChatPage() {
                 theme={theme}
               />
             )}
-
-            <div className="flex gap-3 items-end">
-              <div className="flex-1 relative">
-                <textarea
-                  ref={inputRef}
-                  className={`w-full p-4 pr-12 border rounded-2xl resize-none focus:outline-none transition-colors ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.text} ${themeClasses.inputFocus} placeholder-gray-500`}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      sendMessage();
-                    }
-                  }}
-                  placeholder="Type your message... (Press Enter to send)"
-                  rows={1}
-                  style={{ minHeight: '56px', maxHeight: '120px' }}
-                  disabled={isLoading}
-                />
-                <input
-                  type="file"
-                  id="fileUpload"
-                  accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      sendMessage(undefined, file);
-                      e.target.value = ''; // Reset input
-                    }
-                  }}
-                  className="hidden"
-                />
-                <label
-                  htmlFor="fileUpload"
-                  className="absolute top-1/2 right-3 transform -translate-y-1/2 cursor-pointer text-emerald-500 hover:text-emerald-600 transition-colors"
-                  title="Upload file"
-                >
-                  📎
-                </label>
-              </div>
+            <div className="flex items-end gap-2">
+              <textarea
+                ref={inputRef}
+                className={`flex-1 resize-none rounded-2xl border p-3 focus:outline-none transition-colors ${themeClasses.inputBg} ${themeClasses.inputBorder} ${themeClasses.text}`}
+                rows={1}
+                placeholder="Type your message…"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) =>
+                  e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), sendMessage())
+                }
+                disabled={isLoading}
+                style={{ maxHeight: '120px' }}
+              />
+              <input
+                type="file"
+                id="fileUpload"
+                accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    sendMessage(undefined, file);
+                    e.currentTarget.value = '';
+                  }
+                }}
+                className="hidden"
+              />
+              <label
+                htmlFor="fileUpload"
+                className="cursor-pointer text-emerald-500 hover:text-emerald-600"
+                title="Upload file"
+              >
+                📎
+              </label>
               <button
                 onClick={() => sendMessage()}
                 disabled={!input.trim() || isLoading}
-                className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 disabled:from-gray-300 disabled:to-gray-400 text-white p-4 rounded-2xl transition-all duration-200 shadow-lg hover:shadow-xl disabled:shadow-none flex items-center justify-center"
+                className="rounded-full p-3 bg-gradient-to-r from-emerald-500 to-emerald-600 disabled:opacity-50 text-white"
               >
                 <Send className="w-5 h-5" />
               </button>
             </div>
-            <p className={`text-xs mt-2 text-center ${themeClasses.textMuted}`}>
-              You can upload files like PDF, Word, or images for the AI to read and respond.
+            <p className={`text-center text-xs ${themeClasses.textMuted}`}>
+              You can upload PDF, Word, or images for the AI to read and respond.
             </p>
           </div>
-        </div>
+        </footer>
       </div>
     </div>
   );
