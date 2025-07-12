@@ -358,7 +358,7 @@ export default function ChatPage() {
               <SafeImage
                 src="/vb.png"
                 alt="VB Capital"
-                className="w-7 h-5 sm:w-9 sm:h-7 flex-shrink-0"
+                className="w-9 h-7 sm:w-9 sm:h-7 flex-shrink-0"
                 theme={theme}
                 fallback={<Building2 className={`w-5 h-5 ${themeClasses.textMuted}`} />}
               />
@@ -367,7 +367,7 @@ export default function ChatPage() {
                   VB Capital Assistant
                 </h1>
                 <div className="text-xs sm:text-sm text-green-600 flex items-center gap-1">
-                  <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></div>
+                  
                   <span className="hidden sm:inline">Online</span>
                 </div>
               </div>
@@ -423,20 +423,12 @@ export default function ChatPage() {
 
             <div className="flex gap-2 sm:gap-3 items-end">
               <div className="flex-1 relative">
-                <textarea
+                                <textarea
                   ref={inputRef}
                   className={`
-                    w-full
-                    p-3 sm:p-4 pr-10 sm:pr-12
-                    border rounded-xl sm:rounded-2xl
-                    resize-none
-                    focus:outline-none
-                    transition-colors
-                    text-sm sm:text-base
-                    ${themeClasses.inputBg}
-                    ${themeClasses.inputBorder}
-                    ${themeClasses.text}
-                    ${themeClasses.inputFocus}
+                    w-full p-4 pr-12 border-2 border-green-500 rounded-2xl resize-none focus:outline-none transition-colors text-sm sm:text-base
+                    min-h-[56px] max-h-[120px] sm:max-h-[160px] md:max-h-[200px] overflow-hidden sm:overflow-y-auto
+                    ${themeClasses.inputBg} ${themeClasses.text} focus:border-green-400 focus:ring-2 focus:ring-green-200
                     placeholder-gray-500
                   `}
                   value={input}
@@ -449,22 +441,25 @@ export default function ChatPage() {
                   }}
                   placeholder="Type your message… (Press Enter to send)"
                   rows={1}
-                  style={{ minHeight: '48px', maxHeight: '120px' }}
                   disabled={isLoading}
                 />
                 <input
                   type="file"
                   id="fileUpload"
                   accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                  className="hidden"
                   onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      sendMessage(undefined, file);
+                    const f = e.target.files?.[0];
+                    if (f) {
+                      sendMessage(undefined, f);
                       e.target.value = '';
                     }
                   }}
-                  className="hidden"
                 />
+
+
+
+
                 <label
                   htmlFor="fileUpload"
                   className="absolute top-1/2 right-2 sm:right-3 transform -translate-y-1/2 cursor-pointer text-emerald-500 hover:text-emerald-600 transition-colors"

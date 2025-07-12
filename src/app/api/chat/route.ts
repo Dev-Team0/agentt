@@ -1,103 +1,95 @@
+// src/app/api/chat/route.ts
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
+
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
-// Define proper types
+
 interface Message {
   role: 'user' | 'assistant';
   content: string;
 }
 
-interface GeminiMessage {
-  role: 'user' | 'model';
-  parts: Array<{ text: string }>;
-}
 
-// System prompt that defines the AI's behavior based on your capability statement
 const SYSTEM_PROMPT = `
-You are VB Capital AI, the expert assistant for VB Capital Partners Corp—a certified Small Business founded on September 12, 2022, specializing in Cloud-Based IT Professional Services and Contract Compliance Software.
+You are VB Capital AI, assisting with inquiries about VB Capital Partners Corp (founded 09/12/2022).
 
-Capability Statement Highlights:
-- **CAGE Code**: [Your CAGE Code]
-- **DUNS Number**: [Your DUNS Number]
-- **NAICS Codes**: 518210, 541511, 541512, 541618
-- **Core Competencies**:
-  - Cloud architecture design & migration
-  - Monitoring and reporting of MBE/DBE and prevailing wage compliance
-  - Custom dashboard and analytics development
-- **Differentiators**:
-  - Rapid deployment with in-memory document processing (no persistent storage)
-  - Deep expertise with federal/state procurement procedures
-  - Proven track record: contracts with Santander, NHLBI, Maryland Stadium Authority
-- **Past Performance**:
-  - Vehicle Registration System modernization (Ghana DVLA)
-  - Cloud contract compliance solution for Maryland Stadium Authority
-- **Company Data**:
-  - Headquarters: Oduman, Greater Accra Region, Ghana
-  - Employees: 10
-  - NAICS: as above
 
-Guidelines:
-1. Maintain a professional, concise tone.
-2. Use bullet points for lists and bold for emphasis.
-3. Tailor answers to procurement officers, RFP reviewers, and government Prime Contractors.
-4. Focus on how VB Capital solves contract compliance, cloud migration, and reporting challenges.
-5. Do not provide financial advice—only factual, capability-based insights.
-6. If you lack relevant information, say “I don’t have enough information to answer that definitively.”
-`;
+**Key Details:**
+- **Contact**: Ebo Biney | info@vbcapitalpartners.com | www.vbcapitalpartners.com
+- **NAICS**: 518210, 541511-12, 541618
+- **HQ**: Oduman, Ghana | Team: 10
+
+
+**Core Expertise:**
+✓ Cloud architecture & migration
+✓ MBE/DBE compliance reporting
+✓ Federal/state procurement
+✓ Rapid deployment solutions
+
+
+**Notable Clients**:
+- Santander
+- NHLBI
+- Maryland Stadium Authority
+
+
+**Response Guidelines:**
+1. Be professional, concise (<200 words)
+2. Focus on contract compliance/cloud solutions
+3. Use bullet points for clarity
+4. For unknown queries: "I don't have enough information to answer definitively"
+5. Direct complex inquiries to info@vbcapitalpartners.com
+`.trim();
+
 
 export async function POST(req: Request) {
   try {
     const { messages }: { messages: Message[] } = await req.json();
 
-    // Initialize the model
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    // Convert messages to Gemini format and filter out any nulls
-    const conversationHistory: GeminiMessage[] = messages
-      .map((message) => {
-        if (message.role === 'user') {
-          return {
-            role: 'user',
-            parts: [{ text: message.content }],
-          };
-        } else if (message.role === 'assistant') {
-          return {
-            role: 'model',
-            parts: [{ text: message.content }],
-          };
-        }
-        return null;
-      })
-      .filter((msg): msg is GeminiMessage => msg !== null);
+    // Build a single prompt string:
+    // 1) System prompt
+    // 2) All prior turns labeled
+    // 3) Latest user message
+    const prior = messages
+      .slice(0, -1)
+      .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
+      .join('\n');
 
-    // Get the latest user message
-    const latestMessage = messages[messages.length - 1];
 
-    // Create the full prompt with system instructions
-    const fullPrompt = `${SYSTEM_PROMPT}\n\nUser: ${latestMessage.content}`;
+    const latest = messages[messages.length - 1].content;
+    const fullPrompt = `${SYSTEM_PROMPT}\n\n${prior}\n\nUser: ${latest}`;
 
-    // Start a chat with conversation history for context
-    const chat = model.startChat({
-      history: conversationHistory.slice(0, -1), // all but the last
-    });
 
-    // Generate response using the chat context
+    // Start chat with no history
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const chat = model.startChat();
+
+
+    // Send everything in one go
     const result = await chat.sendMessage(fullPrompt);
-    const response = await result.response;
-    const text = response.text();
 
-    return NextResponse.json({
-      role: 'assistant',
-      content: text,
-    });
 
-  } catch (error) {
-    console.error("Error calling Gemini:", error);
+    // Pull out the reply text
+    const candidates = Array.isArray((result.response as any).candidates)
+      ? (result.response as any).candidates
+      : [];
+    const text =
+      candidates[0]?.content?.parts?.[0]?.text ??
+      'Sorry, I could not generate a response.';
+
+
+    return NextResponse.json({ content: text });
+  } catch (err: any) {
+    console.error('🛑 /api/chat error:', err);
     return NextResponse.json(
-      { error: "Error processing your request" },
+      { error: err.message || 'Error processing your request' },
       { status: 500 }
     );
   }
 }
+
+
+
