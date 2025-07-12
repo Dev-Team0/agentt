@@ -32,9 +32,9 @@ export function QuestionSuggestions({ onSelectQuestion, conversations, theme }: 
     }
    
     return [
-      "What are VB Capital's current investment focus areas?",
-      "Can you analyze a startup's investment potential?",
-      "What portfolio companies are in the AI sector?"
+      "Draft an email for me",
+      "What is the objective for this week based on monthly schedule?",
+      "Who is the POC?"
     ];
   };
 
