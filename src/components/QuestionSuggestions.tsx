@@ -34,7 +34,7 @@ export function QuestionSuggestions({ onSelectQuestion, conversations, theme }: 
     return [
       "Draft an email for me",
       "What is the objective for this week based on monthly schedule?",
-      "Who is the POC?"
+      "What can you do?"
     ];
   };
 

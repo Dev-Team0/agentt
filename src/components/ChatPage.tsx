@@ -426,7 +426,7 @@ export default function ChatPage() {
                                 <textarea
                   ref={inputRef}
                   className={`
-                    w-full p-4 pr-12 border-2 border-green-500 rounded-2xl resize-none focus:outline-none transition-colors text-sm sm:text-base
+                    w-full p-4 pr-12 border-1 border-green-200 rounded-2xl resize-none focus:outline-none transition-colors text-sm sm:text-base
                     min-h-[56px] max-h-[120px] sm:max-h-[160px] md:max-h-[200px] overflow-hidden sm:overflow-y-auto
                     ${themeClasses.inputBg} ${themeClasses.text} focus:border-green-400 focus:ring-2 focus:ring-green-200
                     placeholder-gray-500
@@ -439,7 +439,7 @@ export default function ChatPage() {
                       sendMessage();
                     }
                   }}
-                  placeholder="Type your message… (Press Enter to send)"
+                  placeholder="Type your message…"
                   rows={1}
                   disabled={isLoading}
                 />
