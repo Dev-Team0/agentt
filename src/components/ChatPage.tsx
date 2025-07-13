@@ -129,7 +129,7 @@ export default function ChatPage() {
     setMessages([
       {
         role: 'assistant',
-        content: "Hello! I'm your VB Capital AI Assistant. I can help with investment analysis, portfolio insights, and market trends. How can I assist you today?",
+        content: "Hello! I'm your VB Capital AI Assistant. How can I assist you today?",
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       },
     ]);
