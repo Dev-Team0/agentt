@@ -1,4 +1,8 @@
+// File: src/lib/theme.ts
+
+
 export type Theme = 'light' | 'dark' | 'very-dark';
+
 
 export interface ThemeClasses {
   bg: string;
@@ -19,6 +23,7 @@ export interface ThemeClasses {
   buttonPrimary: string;
   buttonSecondary: string;
 }
+
 
 export const getThemeClasses = (theme: Theme): ThemeClasses => {
   switch (theme) {
@@ -84,3 +89,8 @@ export const getThemeClasses = (theme: Theme): ThemeClasses => {
       };
   }
 };
+
+
+
+
+
