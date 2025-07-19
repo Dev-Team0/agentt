@@ -1,9 +1,6 @@
 'use client';
 
-
-
-
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Send, Menu, Building2, LogOut, Paperclip } from 'lucide-react';
 import { Conversation, Message, Theme } from '@/lib/types';
 import { SafeImage } from '@/components/ui/SafeImage';
@@ -14,10 +11,6 @@ import { QuestionSuggestions } from './QuestionSuggestions';
 import { ChatMessage } from './ChatMessage';
 import { TypingIndicator } from './TypingIndicator';
 import { useRouter } from 'next/navigation';
-import React from 'react';
-
-
-
 
 export default function ChatPage() {
   const router = useRouter();
@@ -32,15 +25,9 @@ export default function ChatPage() {
   const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
 
-
-
-
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const themeClasses = getThemeClasses(theme);
-
-
-
 
   // Load theme
   useEffect(() => {
@@ -53,9 +40,6 @@ export default function ChatPage() {
     setTheme(newTheme);
     localStorage.setItem('vb-theme', newTheme);
   };
-
-
-
 
   // Auth check
   useEffect(() => {
@@ -78,9 +62,6 @@ export default function ChatPage() {
     checkAuth();
   }, [router]);
 
-
-
-
   // Admin flag
   useEffect(() => {
     const checkAdmin = async () => {
@@ -95,9 +76,6 @@ export default function ChatPage() {
     checkAdmin();
   }, []);
 
-
-
-
   // Logout sync across tabs
   useEffect(() => {
     const handleStorage = (e: StorageEvent) => {
@@ -109,13 +87,10 @@ export default function ChatPage() {
     return () => window.removeEventListener('storage', handleStorage);
   }, [router]);
 
-
-
-
-  // ** Load conversations **
+  // Load conversations
   useEffect(() => {
     if (isAuthChecking) return;
-    const loadConversations = async () => {
+    (async () => {
       const res = await fetch('/api/conversations');
       if (res.ok) {
         const data: Conversation[] = await res.json();
@@ -125,20 +100,13 @@ export default function ChatPage() {
           setMessages(data[0].messages);
         }
       }
-    };
-    loadConversations();
+    })();
   }, [isAuthChecking]);
-
-
-
 
   // Scroll on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-
-
 
   // Autofocus input
   useEffect(() => {
@@ -148,16 +116,10 @@ export default function ChatPage() {
     return () => clearTimeout(timer);
   }, [messages, isLoading]);
 
-
-
-
   const generateConversationTitle = (text: string) => {
     const words = text.split(' ').slice(0, 4).join(' ');
     return words.length > 30 ? words.substring(0, 30) + '...' : words;
   };
-
-
-
 
   const createNewConversation = () => {
     setCurrentConversationId(null);
@@ -172,11 +134,8 @@ export default function ChatPage() {
     setSidebarOpen(false);
   };
 
-
-
-
   const selectConversation = (id: string) => {
-    const conv = conversations.find((c) => c.id === id);
+    const conv = conversations.find(c => c.id === id);
     if (conv) {
       setCurrentConversationId(id);
       setMessages(conv.messages);
@@ -184,46 +143,31 @@ export default function ChatPage() {
     }
   };
 
-
-
-
   const updateConversationMessages = (id: string, newMessages: Message[]) => {
-    setConversations((prev) =>
-      prev.map((conv) =>
+    setConversations(prev =>
+      prev.map(conv =>
         conv.id === id ? { ...conv, messages: newMessages, time: 'Just now' } : conv
       )
     );
   };
 
-
-
-
   const sendFeedback = (msg: Message, fb: 'helpful' | 'not-helpful') => {
     console.log(`Feedback: ${fb} for message:`, msg);
   };
 
-
-
-
-  // ** Send & persist **
+  // Send & persist
   const sendMessage = async (messageText?: string, file?: File): Promise<void> => {
-    const text = messageText || input;
+    const text = messageText ?? input;
     if (!text.trim() && !file) return;
 
-
-
-
     // Build user message
-    let userMessage: Message = {
+    const userMessage: Message = {
       role: 'user',
       content: file
         ? `📎 Uploaded file: ${file.name}${text ? `\n\n${text}` : ''}`
         : text,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
-
-
-
 
     // Handle file upload
     if (file) {
@@ -234,16 +178,10 @@ export default function ChatPage() {
       userMessage.content = `[file:${file.name}](${url})${text ? `\n\n${text}` : ''}`;
     }
 
-
-
-
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
     setInput('');
     setIsLoading(true);
-
-
-
 
     // Call AI
     let aiMessage: Message;
@@ -272,73 +210,58 @@ export default function ChatPage() {
       };
     }
 
-
-
-
     const finalMessages = [...newMessages, aiMessage];
     setMessages(finalMessages);
 
-
-
-
     // Persist to /api/conversations
     const title = generateConversationTitle(text);
-try {
-  if (currentConversationId) {
-    // ─── UPDATE EXISTING ────────────────────────────────────────────
-    // Don't overwrite the title after the first message
-    await fetch('/api/conversations', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id: currentConversationId,
-        messages: finalMessages,
-      }),
-    });
-    updateConversationMessages(currentConversationId, finalMessages);
-  } else {
-    // ─── CREATE NEW ───────────────────────────────────────────────
-    // Compute title only once, for the very first question
-    const title = generateConversationTitle(text);
-    const createRes = await fetch('/api/conversations', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title,
-        messages: finalMessages,
-      }),
-    });
-    const { id } = await createRes.json();
-    setCurrentConversationId(id);
+    try {
+      if (currentConversationId) {
+        // Update existing
+        await fetch('/api/conversations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: currentConversationId,
+            title,
+            messages: finalMessages,
+          }),
+        });
+        updateConversationMessages(currentConversationId, finalMessages);
+      } else {
+        // Create new
+        const createRes = await fetch('/api/conversations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title,
+            messages: finalMessages,
+          }),
+        });
+        const { id } = await createRes.json();
+        setCurrentConversationId(id);
 
-
-    // Refresh sidebar list
-    const all = await fetch('/api/conversations');
-    if (all.ok) setConversations(await all.json());
-  }
-} catch (saveError) {
-  console.error('Failed to save conversation:', saveError);
-} finally {
-  setIsLoading(false);
-}  };
-
-
-
-
-  const handleLogout = async () => {
-    await fetch('/api/logout', { method: 'POST' });
-    localStorage.setItem('auth', 'false');
-    window.dispatchEvent(new Event('storage'));
-    router.push('/');
+        // Refresh sidebar list
+        const all = await fetch('/api/conversations');
+        if (all.ok) setConversations(await all.json());
+      }
+    } catch (saveError) {
+      console.error('Failed to save conversation:', saveError);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-
-
+  const handleLogout = () => {
+    router.push('/');
+    localStorage.setItem('auth', 'false');
+    window.dispatchEvent(new Event('storage'));
+  };
 
   const handleDeleteConversation = async (id: string) => {
     const res = await fetch(`/api/conversations/${id}`, { method: 'DELETE' });
     if (res.ok) {
-      setConversations((prev) => prev.filter((conv) => conv.id !== id));
+      setConversations(prev => prev.filter(conv => conv.id !== id));
       if (currentConversationId === id) {
         setCurrentConversationId(null);
         setMessages([]);
@@ -346,22 +269,16 @@ try {
     }
   };
 
-
-
-
   if (isAuthChecking) {
     return (
       <div className={`flex items-center justify-center h-screen ${themeClasses.bg} ${themeClasses.text}`}>
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto mb-4" />
           <p>Loading...</p>
         </div>
       </div>
     );
   }
-
-
-
 
   return (
     <div className={`h-screen flex ${themeClasses.bg}`}>
@@ -377,9 +294,6 @@ try {
         theme={theme}
       />
 
-
-
-
       <SettingsModal
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
@@ -387,14 +301,19 @@ try {
         onThemeChange={handleThemeChange}
       />
 
-
-
-
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <header className={`border-b px-6 py-4 flex items-center justify-between shadow-sm ${themeClasses.cardBg} ${themeClasses.border}`}>
+        <header
+          className={`border-b px-6 py-4 flex items-center justify-between shadow-sm ${themeClasses.cardBg} ${
+            themeClasses.border
+          }`}
+        >
           <div className="flex items-center gap-4">
-            <button onClick={() => setSidebarOpen(true)} className={`p-2 rounded-lg transition-colors ${themeClasses.hoverSecondary} ${themeClasses.focus}`} type="button">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className={`p-2 rounded-lg transition-colors ${themeClasses.hoverSecondary} ${themeClasses.focus}`}
+              type="button"
+            >
               <Menu className={`w-5 h-5 ${themeClasses.textMuted}`} />
             </button>
             <div className="flex items-center gap-3">
@@ -402,13 +321,12 @@ try {
                 src="/vb.png"
                 alt="VB Capital"
                 className="w-9 h-7"
-                theme={theme}
                 fallback={<Building2 className={`w-5 h-5 ${themeClasses.textMuted}`} />}
               />
               <div>
                 <h1 className={`font-semibold ${themeClasses.text}`}>VB Capital Assistant</h1>
                 <div className="text-sm text-green-600 flex items-center gap-1">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <div className="w-2 h-2 bg-green-500 rounded-full" />
                   Online
                 </div>
               </div>
@@ -416,40 +334,44 @@ try {
           </div>
           <div className="flex items-center gap-2">
             {isAdmin && (
-              <button onClick={() => router.push('/admin')} className={`text-sm px-4 py-2 rounded-lg transition-colors ${themeClasses.buttonSecondary} ${themeClasses.text}`}>
+              <button
+                onClick={() => router.push('/admin')}
+                className={`text-sm px-4 py-2 rounded-lg transition-colors ${themeClasses.buttonSecondary} ${themeClasses.text}`}
+              >
                 Admin
               </button>
             )}
-            <button onClick={handleLogout} className="text-sm px-4 py-2 rounded-lg bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white flex items-center gap-2 transition-colors shadow">
+            <button
+              onClick={handleLogout}
+              className="text-sm px-4 py-2 rounded-lg bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white flex items-center gap-2 transition-colors shadow"
+            >
               <LogOut className="w-4 h-4" /> Logout
             </button>
           </div>
         </header>
 
-
-
-
         {/* Main Content */}
         <div className="flex-1 overflow-y-auto px-6 py-6 space-y-0">
           <div className="max-w-4xl mx-auto">
             {messages.map((msg, i) => (
-              <ChatMessage key={i} message={msg} theme={theme} onFeedback={msg.role === 'assistant' ? sendFeedback : undefined} />
+              <ChatMessage
+                key={i}
+                message={msg}
+                theme={theme}
+                onFeedback={msg.role === 'assistant' ? sendFeedback : undefined}
+              />
             ))}
             {isLoading && <TypingIndicator theme={theme} />}
             <div ref={messagesEndRef} />
           </div>
         </div>
 
-
-
-
         {/* Chat Input Section */}
         <div className={`border-t px-6 py-4 ${themeClasses.cardBg} ${themeClasses.border}`}>
           <div className="max-w-4xl mx-auto">
-            {messages.length <= 1 && <QuestionSuggestions onSelectQuestion={sendMessage} conversations={conversations} theme={theme} />}
-
-
-
+            {messages.length <= 1 && (
+              <QuestionSuggestions onSelectQuestion={sendMessage} conversations={conversations} theme={theme} />
+            )}
 
             <div className="flex gap-3 items-end">
               <div className="flex-1 relative">
@@ -470,8 +392,8 @@ try {
                     placeholder-gray-500
                   `}
                   value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => {
+                  onChange={e => setInput(e.target.value)}
+                  onKeyDown={e => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
                       sendMessage();
@@ -483,14 +405,11 @@ try {
                   disabled={isLoading}
                 />
 
-
-
-
                 <input
                   type="file"
                   id="fileUpload"
                   accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
-                  onChange={(e) => {
+                  onChange={e => {
                     const file = e.target.files?.[0];
                     if (file) {
                       sendMessage(undefined, file);
@@ -524,8 +443,5 @@ try {
     </div>
   );
 }
-
-
-
 
 

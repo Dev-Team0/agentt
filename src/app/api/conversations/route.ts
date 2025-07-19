@@ -11,6 +11,12 @@ interface Message {
   timestamp: string;
 }
 
+interface UpdateData {
+  messages: any;
+  time: string;
+  title?: string;
+}
+
 export async function GET(req: NextRequest) {
   console.log('🧩 cookie header:', req.headers.get('cookie'));
 
@@ -79,7 +85,7 @@ export async function POST(req: NextRequest) {
 
     if (id) {
       // ─── UPDATE EXISTING ───────────────────────────────────────────
-      const data: any = {
+      const data: UpdateData = {
         messages: JSON.parse(JSON.stringify(messages)),
         time: now,
       };
@@ -111,4 +117,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to save' }, { status: 500 });
   }
 }
-
