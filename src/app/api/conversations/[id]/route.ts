@@ -7,9 +7,11 @@ const SECRET = process.env.NEXTAUTH_SECRET!;
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   console.log('🧩 cookie header:', req.headers.get('cookie'));
+
+  const { params } = context;
 
   // 1) Authenticate
   const token = await getToken({ req, secret: SECRET });
@@ -42,9 +44,11 @@ export async function GET(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   console.log('🧩 cookie header:', req.headers.get('cookie'));
+
+  const { params } = context;
 
   // 1) Authenticate
   const token = await getToken({ req, secret: SECRET });
