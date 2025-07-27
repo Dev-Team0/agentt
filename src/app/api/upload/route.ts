@@ -1,16 +1,12 @@
-// src/app/api/upload/route.ts - Debug version
 import { writeFile, mkdir, stat, unlink } from 'fs/promises';
 import { join } from 'path';
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { v4 as uuidv4 } from 'uuid';
 
-
 export const dynamic = 'force-dynamic';
 
-
 const SECRET = process.env.NEXTAUTH_SECRET!;
-
 
 const config = {
   maxFileSize: 10 * 1024 * 1024, // 10MB
@@ -27,6 +23,9 @@ const config = {
   uploadDir: join(process.cwd(), 'public/uploads')
 };
 
+interface ErrorWithDetails extends Error {
+  details?: string;
+}
 
 export async function POST(req: NextRequest) {
   console.log('[UploadAPI] Starting file upload process...');
@@ -43,24 +42,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized - Please log in' }, { status: 401 });
     }
 
-
     console.log(`[UploadAPI] User authenticated: ${userId}`);
-
 
     // 2. Parse incoming form data
     console.log('[UploadAPI] Step 2: Parsing form data...');
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
 
-
     if (!file) {
       console.log('[UploadAPI] ERROR: No file in request');
       return NextResponse.json({ error: 'No file uploaded' }, { status: 400 });
     }
 
-
     console.log(`[UploadAPI] File received: ${file.name}, size: ${file.size}, type: ${file.type}`);
-
 
     // 3. Validate file type
     console.log('[UploadAPI] Step 3: Validating file type...');
@@ -72,7 +66,6 @@ export async function POST(req: NextRequest) {
       }, { status: 415 });
     }
 
-
     // 4. Validate file size
     console.log('[UploadAPI] Step 4: Validating file size...');
     if (file.size > config.maxFileSize) {
@@ -82,7 +75,6 @@ export async function POST(req: NextRequest) {
         maxSizeMB: config.maxFileSize / 1024 / 1024
       }, { status: 413 });
     }
-
 
     // 5. Ensure upload directory exists
     console.log('[UploadAPI] Step 5: Creating upload directory...');
@@ -94,14 +86,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
     }
 
-
     // 6. Write file to disk
     console.log('[UploadAPI] Step 6: Writing file to disk...');
     const buffer = Buffer.from(await file.arrayBuffer());
     const ext = file.name.split('.').pop()?.toLowerCase() || 'bin';
     const uniqueName = `${uuidv4()}.${ext}`;
     const filePath = join(config.uploadDir, uniqueName);
-
 
     try {
       await writeFile(filePath, buffer);
@@ -110,7 +100,6 @@ export async function POST(req: NextRequest) {
       console.error('[UploadAPI] ERROR: Failed to write file:', err);
       return NextResponse.json({ error: 'Failed to save file' }, { status: 500 });
     }
-
 
     // 7. Verify the file was saved
     console.log('[UploadAPI] Step 7: Verifying file...');
@@ -127,7 +116,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'File verification failed' }, { status: 500 });
     }
 
-
     // 8. Respond with file metadata
     const fileUrl = `/uploads/${uniqueName}`;
    
@@ -142,14 +130,14 @@ export async function POST(req: NextRequest) {
       uploadedAt: new Date().toISOString()
     });
 
-
-  } catch (err: unknown) {
-    console.error('[UploadAPI] FATAL ERROR:', err);
-    console.error('[UploadAPI] Error stack:', err instanceof Error ? err.stack : 'No stack trace available');
+  } catch (err) {
+    const error = err as ErrorWithDetails;
+    console.error('[UploadAPI] FATAL ERROR:', error);
+    console.error('[UploadAPI] Error stack:', error.stack);
    
     return NextResponse.json({
       error: 'Internal server error during upload',
-      details: process.env.NODE_ENV === 'development' && err instanceof Error ? err.message : undefined,
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
       timestamp: new Date().toISOString()
     }, { status: 500 });
   }
