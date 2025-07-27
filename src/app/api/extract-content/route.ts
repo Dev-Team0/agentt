@@ -67,7 +67,8 @@ export async function POST(req: NextRequest) {
       });
 
       try {
-        const content = await FileContentExtractor.extractContent(file.url, file.type);
+        // Pass file size to the extractor for better metadata
+        const content = await FileContentExtractor.extractContent(file.url, file.type, file.size);
         extractedContents.push({
           fileName: file.name,
           fileType: file.type,
@@ -77,6 +78,7 @@ export async function POST(req: NextRequest) {
           success: true
         });
         console.log(`[ExtractAPI] Successfully extracted content from ${file.name}`);
+        console.log(`[ExtractAPI] Content preview: ${content.text.substring(0, 100)}...`);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         console.error(`[ExtractAPI] Failed to extract content from ${file.name}:`, errorMessage);
@@ -92,10 +94,12 @@ export async function POST(req: NextRequest) {
     }
 
     console.log(`[ExtractAPI] Completed processing ${files.length} files`);
+    console.log(`[ExtractAPI] Success rate: ${extractedContents.filter(c => c.success).length}/${files.length}`);
 
     return NextResponse.json({
       success: true,
       filesProcessed: files.length,
+      successfulExtractions: extractedContents.filter(c => c.success).length,
       extractedContents: extractedContents
     });
 

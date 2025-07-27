@@ -1,7 +1,3 @@
-import { readFile, stat } from 'fs/promises';
-import { join } from 'path';
-import { existsSync } from 'fs';
-
 interface ExtractedContent {
   text: string;
   metadata?: {
@@ -37,11 +33,39 @@ interface TesseractLogger {
 }
 
 export class FileContentExtractor {
+  // Helper method to fetch file buffer from URL (works with both local and blob URLs)
+  static async fetchFileBuffer(fileUrl: string): Promise<Buffer> {
+    if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
+      // Fetch from remote URL (Vercel Blob or other cloud storage)
+      console.log(`[FileExtractor] Fetching from remote URL: ${fileUrl}`);
+      const response = await fetch(fileUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch file: ${response.status} ${response.statusText}`);
+      }
+      const arrayBuffer = await response.arrayBuffer();
+      return Buffer.from(arrayBuffer);
+    } else {
+      // Local file path (for development)
+      const { readFile } = await import('fs/promises');
+      const { join } = await import('path');
+      const { existsSync } = await import('fs');
+      
+      const cleanPath = fileUrl.startsWith('/') ? fileUrl.substring(1) : fileUrl;
+      const fullPath = join(process.cwd(), 'public', cleanPath);
+      
+      if (!existsSync(fullPath)) {
+        throw new Error(`File not found: ${fullPath}`);
+      }
+      
+      return await readFile(fullPath);
+    }
+  }
+
   // Extract text from PDF files
-  static async extractFromPDF(filePath: string): Promise<ExtractedContent> {
+  static async extractFromPDF(fileUrl: string): Promise<ExtractedContent> {
     try {
       const pdf = await import('pdf-parse');
-      const dataBuffer = await readFile(filePath);
+      const dataBuffer = await this.fetchFileBuffer(fileUrl);
       const data = await pdf.default(dataBuffer) as PDFParseResult;
      
       return {
@@ -60,10 +84,10 @@ export class FileContentExtractor {
   }
 
   // Extract text from DOCX files
-  static async extractFromDOCX(filePath: string): Promise<ExtractedContent> {
+  static async extractFromDOCX(fileUrl: string): Promise<ExtractedContent> {
     try {
       const mammoth = await import('mammoth');
-      const dataBuffer = await readFile(filePath);
+      const dataBuffer = await this.fetchFileBuffer(fileUrl);
       const result = await mammoth.extractRawText({ buffer: dataBuffer }) as MammothResult;
      
       return {
@@ -81,10 +105,10 @@ export class FileContentExtractor {
   }
 
   // Extract text from DOC files (legacy Word format)
-  static async extractFromDOC(filePath: string): Promise<ExtractedContent> {
+  static async extractFromDOC(fileUrl: string): Promise<ExtractedContent> {
     try {
       const mammoth = await import('mammoth');
-      const dataBuffer = await readFile(filePath);
+      const dataBuffer = await this.fetchFileBuffer(fileUrl);
       const result = await mammoth.extractRawText({ buffer: dataBuffer }) as MammothResult;
      
       return {
@@ -104,9 +128,10 @@ export class FileContentExtractor {
   }
 
   // Extract text from plain text files
-  static async extractFromTXT(filePath: string): Promise<ExtractedContent> {
+  static async extractFromTXT(fileUrl: string): Promise<ExtractedContent> {
     try {
-      const content = await readFile(filePath, 'utf-8');
+      const dataBuffer = await this.fetchFileBuffer(fileUrl);
+      const content = dataBuffer.toString('utf-8');
      
       return {
         text: content.trim(),
@@ -122,20 +147,16 @@ export class FileContentExtractor {
     }
   }
 
-  // Safe image processing with multiple fallback options
-  static async extractFromImage(filePath: string): Promise<ExtractedContent> {
-    console.log(`[FileExtractor] Processing image: ${filePath}`);
+  // Safe image processing with OpenAI Vision API
+  static async extractFromImage(fileUrl: string, fileSize?: number): Promise<ExtractedContent> {
+    console.log(`[FileExtractor] Processing image: ${fileUrl}`);
    
     try {
-      // Get basic file info first
-      const stats = await stat(filePath);
-      const fileName = filePath.split('/').pop() || 'image';
-     
       // Try Vision API first (if available and configured)
       if (process.env.OPENAI_API_KEY) {
         try {
           console.log(`[FileExtractor] Attempting Vision API analysis...`);
-          return await this.analyzeImageWithVisionAPI(filePath, stats.size);
+          return await this.analyzeImageWithVisionAPI(fileUrl, fileSize);
         } catch (visionError) {
           const errorMessage = visionError instanceof Error ? visionError.message : 'Unknown error';
           console.warn(`[FileExtractor] Vision API failed: ${errorMessage}`);
@@ -146,7 +167,7 @@ export class FileContentExtractor {
       // Fallback to OCR if Vision API fails or isn't available
       try {
         console.log(`[FileExtractor] Attempting OCR analysis...`);
-        return await this.extractTextWithOCR(filePath, stats.size);
+        return await this.extractTextWithOCR(fileUrl, fileSize);
       } catch (ocrError) {
         const errorMessage = ocrError instanceof Error ? ocrError.message : 'Unknown error';
         console.warn(`[FileExtractor] OCR failed: ${errorMessage}`);
@@ -155,7 +176,7 @@ export class FileContentExtractor {
 
       // Final fallback - basic image info
       console.log(`[FileExtractor] Using basic image info fallback...`);
-      return this.getBasicImageInfo(fileName, stats.size);
+      return this.getBasicImageInfo(fileUrl, fileSize);
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -172,8 +193,12 @@ export class FileContentExtractor {
     }
   }
 
-  // Vision API analysis (with timeout and error handling)
-  static async analyzeImageWithVisionAPI(filePath: string, fileSize: number): Promise<ExtractedContent> {
+  // Vision API analysis using file URL
+  static async analyzeImageWithVisionAPI(fileUrl: string, fileSize?: number): Promise<ExtractedContent> {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error('OpenAI API key not configured');
+    }
+
     // Dynamic import to avoid issues if OpenAI package isn't available
     const OpenAI = await import('openai');
     const openai = new OpenAI.default({
@@ -181,20 +206,28 @@ export class FileContentExtractor {
       timeout: 30000 // 30 second timeout
     });
 
-    // Read and encode image
-    const imageBuffer = await readFile(filePath);
-    const base64Image = imageBuffer.toString('base64');
-   
-    const extension = filePath.split('.').pop()?.toLowerCase();
-    const mimeType = {
-      'jpg': 'image/jpeg',
-      'jpeg': 'image/jpeg',
-      'png': 'image/png',
-      'webp': 'image/webp',
-      'gif': 'image/gif'
-    }[extension || 'jpg'] || 'image/jpeg';
+    // For blob URLs, we can pass them directly to OpenAI
+    // For local URLs, we need to convert to base64
+    let imageUrl = fileUrl;
+    
+    if (!fileUrl.startsWith('http://') && !fileUrl.startsWith('https://')) {
+      // Convert local file to base64 for OpenAI
+      const imageBuffer = await this.fetchFileBuffer(fileUrl);
+      const base64Image = imageBuffer.toString('base64');
+      
+      const extension = fileUrl.split('.').pop()?.toLowerCase();
+      const mimeType = {
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'webp': 'image/webp',
+        'gif': 'image/gif'
+      }[extension || 'jpg'] || 'image/jpeg';
+      
+      imageUrl = `data:${mimeType};base64,${base64Image}`;
+    }
 
-    // Call Vision API with timeout
+    // Call Vision API
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
@@ -208,7 +241,7 @@ export class FileContentExtractor {
             {
               type: "image_url",
               image_url: {
-                url: `data:${mimeType};base64,${base64Image}`,
+                url: imageUrl,
                 detail: "high"
               }
             }
@@ -237,10 +270,11 @@ export class FileContentExtractor {
   }
 
   // OCR analysis fallback
-  static async extractTextWithOCR(filePath: string, fileSize: number): Promise<ExtractedContent> {
+  static async extractTextWithOCR(fileUrl: string, fileSize?: number): Promise<ExtractedContent> {
     const Tesseract = await import('tesseract.js');
    
-    const result = await Tesseract.recognize(filePath, 'eng', {
+    // Tesseract can work with URLs directly for remote files
+    const result = await Tesseract.recognize(fileUrl, 'eng', {
       logger: (m: TesseractLogger) => {
         if (m.status === 'recognizing text' && m.progress % 0.2 < 0.1) {
           console.log(`[FileExtractor] OCR Progress: ${Math.round(m.progress * 100)}%`);
@@ -275,12 +309,13 @@ export class FileContentExtractor {
   }
 
   // Basic image info fallback
-  static getBasicImageInfo(fileName: string, fileSize: number): ExtractedContent {
-    const sizeKB = Math.round(fileSize / 1024);
+  static getBasicImageInfo(fileUrl: string, fileSize?: number): ExtractedContent {
+    const fileName = fileUrl.split('/').pop() || 'image';
+    const sizeKB = fileSize ? Math.round(fileSize / 1024) : 'unknown';
     const extension = fileName.split('.').pop()?.toUpperCase() || 'IMAGE';
    
     return {
-      text: `I can see that you've uploaded an image file named "${fileName}" (${extension} format, ${sizeKB}KB). While I cannot analyze the visual content of the image at the moment, I'm ready to help if you can describe what's in the image or let me know what specific information you're looking for.`,
+      text: `I can see that you've uploaded an image file named "${fileName}" (${extension} format${fileSize ? `, ${sizeKB}KB` : ''}). While I cannot analyze the visual content of the image at the moment, I'm ready to help if you can describe what's in the image or let me know what specific information you're looking for.`,
       metadata: {
         type: 'image',
         processing: 'basic_info_only',
@@ -290,43 +325,34 @@ export class FileContentExtractor {
   }
 
   // Main extraction method with comprehensive error handling
-  static async extractContent(fileUrl: string, mimeType: string): Promise<ExtractedContent> {
-    const cleanPath = fileUrl.startsWith('/') ? fileUrl.substring(1) : fileUrl;
-    const fullPath = join(process.cwd(), 'public', cleanPath);
-   
+  static async extractContent(fileUrl: string, mimeType: string, fileSize?: number): Promise<ExtractedContent> {
     console.log(`[FileExtractor] Processing file: ${fileUrl}`);
-    console.log(`[FileExtractor] Full path: ${fullPath}`);
     console.log(`[FileExtractor] MIME type: ${mimeType}`);
-   
-    if (!existsSync(fullPath)) {
-      console.error(`[FileExtractor] File not found: ${fullPath}`);
-      throw new Error(`File not found: ${fullPath}`);
-    }
    
     try {
       switch (mimeType) {
         case 'application/pdf':
           console.log(`[FileExtractor] Extracting PDF content...`);
-          return await this.extractFromPDF(fullPath);
+          return await this.extractFromPDF(fileUrl);
          
         case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
           console.log(`[FileExtractor] Extracting DOCX content...`);
-          return await this.extractFromDOCX(fullPath);
+          return await this.extractFromDOCX(fileUrl);
          
         case 'application/msword':
           console.log(`[FileExtractor] Extracting DOC content...`);
-          return await this.extractFromDOC(fullPath);
+          return await this.extractFromDOC(fileUrl);
          
         case 'text/plain':
           console.log(`[FileExtractor] Reading text file...`);
-          return await this.extractFromTXT(fullPath);
+          return await this.extractFromTXT(fileUrl);
          
         case 'image/jpeg':
         case 'image/png':
         case 'image/webp':
         case 'image/gif':
           console.log(`[FileExtractor] Processing image file...`);
-          return await this.extractFromImage(fullPath);
+          return await this.extractFromImage(fileUrl, fileSize);
          
         default:
           throw new Error(`Unsupported file type: ${mimeType}`);
