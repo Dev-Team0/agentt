@@ -1,7 +1,6 @@
-import { writeFile, mkdir, stat, unlink } from 'fs/promises';
-import { join } from 'path';
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
+import { put } from '@vercel/blob';
 import { v4 as uuidv4 } from 'uuid';
 
 export const dynamic = 'force-dynamic';
@@ -19,8 +18,7 @@ const config = {
     'text/plain',
     'application/msword',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-  ],
-  uploadDir: join(process.cwd(), 'public/uploads')
+  ]
 };
 
 interface ErrorWithDetails extends Error {
@@ -76,59 +74,42 @@ export async function POST(req: NextRequest) {
       }, { status: 413 });
     }
 
-    // 5. Ensure upload directory exists
-    console.log('[UploadAPI] Step 5: Creating upload directory...');
-    try {
-      await mkdir(config.uploadDir, { recursive: true });
-      console.log(`[UploadAPI] Upload directory ready: ${config.uploadDir}`);
-    } catch (err) {
-      console.error('[UploadAPI] ERROR: Failed to create upload directory:', err);
-      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+    // 5. Check if Blob token is configured
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      console.log('[UploadAPI] ERROR: BLOB_READ_WRITE_TOKEN not configured');
+      return NextResponse.json({ 
+        error: 'Blob storage not configured. Please add BLOB_READ_WRITE_TOKEN environment variable.' 
+      }, { status: 500 });
     }
 
-    // 6. Write file to disk
-    console.log('[UploadAPI] Step 6: Writing file to disk...');
-    const buffer = Buffer.from(await file.arrayBuffer());
+    // 6. Upload to Vercel Blob
+    console.log('[UploadAPI] Step 6: Uploading to Vercel Blob...');
     const ext = file.name.split('.').pop()?.toLowerCase() || 'bin';
-    const uniqueName = `${uuidv4()}.${ext}`;
-    const filePath = join(config.uploadDir, uniqueName);
+    const uniqueName = `${userId}/${uuidv4()}.${ext}`;
 
     try {
-      await writeFile(filePath, buffer);
-      console.log(`[UploadAPI] File written successfully: ${filePath}`);
-    } catch (err) {
-      console.error('[UploadAPI] ERROR: Failed to write file:', err);
-      return NextResponse.json({ error: 'Failed to save file' }, { status: 500 });
-    }
+      const blob = await put(uniqueName, file, {
+        access: 'public'
+      });
 
-    // 7. Verify the file was saved
-    console.log('[UploadAPI] Step 7: Verifying file...');
-    try {
-      const fileStat = await stat(filePath);
-      if (fileStat.size === 0) {
-        console.log('[UploadAPI] ERROR: File saved but appears empty');
-        await unlink(filePath);
-        return NextResponse.json({ error: 'File saved but appears empty' }, { status: 500 });
-      }
-      console.log(`[UploadAPI] File verified: ${fileStat.size} bytes`);
-    } catch (err) {
-      console.error('[UploadAPI] ERROR: Failed to verify file:', err);
-      return NextResponse.json({ error: 'File verification failed' }, { status: 500 });
-    }
+      console.log(`[UploadAPI] File uploaded successfully to Blob: ${blob.url}`);
 
-    // 8. Respond with file metadata
-    const fileUrl = `/uploads/${uniqueName}`;
-   
-    console.log(`[UploadAPI] SUCCESS: ${file.name} -> ${fileUrl}`);
-   
-    return NextResponse.json({
-      success: true,
-      name: file.name,
-      type: file.type,
-      size: file.size,
-      url: fileUrl,
-      uploadedAt: new Date().toISOString()
-    });
+      // 7. Respond with file metadata
+      console.log(`[UploadAPI] SUCCESS: ${file.name} -> ${blob.url}`);
+     
+      return NextResponse.json({
+        success: true,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        url: blob.url,
+        uploadedAt: new Date().toISOString()
+      });
+
+    } catch (err) {
+      console.error('[UploadAPI] ERROR: Failed to upload to Blob:', err);
+      return NextResponse.json({ error: 'Failed to upload file' }, { status: 500 });
+    }
 
   } catch (err) {
     const error = err as ErrorWithDetails;
