@@ -143,15 +143,14 @@ export async function POST(req: NextRequest) {
     });
 
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[UploadAPI] FATAL ERROR:', err);
-    console.error('[UploadAPI] Error stack:', err.stack);
+    console.error('[UploadAPI] Error stack:', err instanceof Error ? err.stack : 'No stack trace available');
    
     return NextResponse.json({
       error: 'Internal server error during upload',
-      details: process.env.NODE_ENV === 'development' ? err.message : undefined,
+      details: process.env.NODE_ENV === 'development' && err instanceof Error ? err.message : undefined,
       timestamp: new Date().toISOString()
     }, { status: 500 });
   }
 }
-
