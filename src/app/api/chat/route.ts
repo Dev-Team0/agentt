@@ -4,14 +4,11 @@ import { getToken } from 'next-auth/jwt';
 import OpenAI from 'openai';
 import { prisma } from '../../../../lib/prisma';
 
-
 const SECRET = process.env.NEXTAUTH_SECRET!;
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' });
 
-
 const SYSTEM_PROMPT = `
 You are VB Capital AI, the expert assistant for VB Capital Partners Corp—a certified Small Business founded on September 12, 2022, specializing in Cloud-Based IT Professional Services and Contract Compliance Software.
-
 
 Follow these rules:
 1. When files are attached, focus on their extracted text
@@ -19,12 +16,9 @@ Follow these rules:
 3. For images, ask clarifying questions if needed
 4. Keep responses concise and actionable
 
-
 Point of Contact(POC): Ebo Biney
 
-
 Email: info@vbcapitalpartners.com | www.vbcapitalpartners.com
-
 
 Capability Statement Highlights:
 - **NAICS Codes**: 518210, 541511, 541512, 541618
@@ -43,7 +37,6 @@ Capability Statement Highlights:
   - Headquarters: Oduman, Greater Accra Region, Ghana
   - Employees: 10
   - NAICS: as above
-
 
 OUR CORE SERVICES
 ADVISORY & MANAGEMENT CONSULTING
@@ -66,7 +59,6 @@ Through process optimization and organizational restructuring, we help
 clients drive efficiencies and improve business outcomes, ensuring
 long-term sustainability and agility.
 
-
 OUR VISION
 Our vision at VB Capital Partners is simple: to make
 leadership and business easier. We believe that trust
@@ -76,7 +68,6 @@ our commitment to delivering high-quality solutions
 that challenge the status quo.
 Our consulting approach begins and ends with our
 customers, ensuring that their needs and goals guide every step of our process.
-
 
 OFFERINGS
 AUDIT REMEDIATION & SUSTAINMENT
@@ -101,7 +92,6 @@ ISSUE MANAGEMENT & REMEDIATION
 Our experts help organizations navigate and resolve operational issues through tailored
 remediation strategies, keeping businesses on track and compliant with industry standards.
 
-
 Guidelines:
 1. Maintain a professional, concise tone.
 2. Use bullet points for lists and bold for emphasis.
@@ -111,27 +101,30 @@ Guidelines:
 6. If you lack relevant information, say "I don't have enough information to answer that definitively."
 `;
 
-
 type MessageRole = 'user' | 'assistant';
 type OpenAIMessageRole = 'system' | MessageRole;
-
 
 interface Message {
   role: MessageRole;
   content: string;
 }
 
+interface FileMetadata {
+  type?: string;
+  wordCount?: number;
+  pages?: number;
+  [key: string]: unknown;
+}
 
 interface FileContent {
   fileName: string;
   fileType: string;
   fileSize: number;
   content: string;
-  metadata?: any;
+  metadata?: FileMetadata;
   error?: string;
   success: boolean;
 }
-
 
 interface OpenAIRequest {
   messages: Message[];
@@ -143,11 +136,9 @@ interface OpenAIRequest {
   }>;
 }
 
-
 export async function POST(req: NextRequest) {
   try {
     console.log('[ChatAPI] Starting chat request...');
-
 
     // 1. Authentication
     const token = await getToken({ req, secret: SECRET });
@@ -159,9 +150,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-
     console.log(`[ChatAPI] Authenticated user: ${userId}`);
-
 
     const account = await prisma.user.findUnique({ where: { userId } });
     if (!account) {
@@ -169,12 +158,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Account not found' }, { status: 401 });
     }
 
-
     if (!process.env.OPENAI_API_KEY) {
       console.log('[ChatAPI] Missing OpenAI API key');
       return NextResponse.json({ error: 'Configuration error: missing OPENAI_API_KEY' }, { status: 500 });
     }
-
 
     // 2. Parse request
     const { messages, files = [] } = await req.json() as OpenAIRequest;
@@ -184,9 +171,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Messages array is required' }, { status: 400 });
     }
 
-
     console.log(`[ChatAPI] Received ${messages.length} messages and ${files.length} files`);
-
 
     // 3. Extract content from uploaded files if any
     let fileContents: FileContent[] = [];
@@ -204,13 +189,11 @@ export async function POST(req: NextRequest) {
           body: JSON.stringify({ files })
         });
 
-
         if (!extractResponse.ok) {
           const errorText = await extractResponse.text();
           console.error(`[ChatAPI] File extraction failed: ${extractResponse.status} ${errorText}`);
           throw new Error(`File extraction failed: ${extractResponse.statusText}`);
         }
-
 
         const extractData = await extractResponse.json();
         fileContents = extractData.extractedContents || [];
@@ -218,7 +201,7 @@ export async function POST(req: NextRequest) {
         const successfulExtractions = fileContents.filter(f => f.success && f.content.trim()).length;
         console.log(`[ChatAPI] Successfully extracted content from ${successfulExtractions}/${files.length} files`);
        
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('[ChatAPI] File content extraction error:', error);
         // Continue with chat even if file extraction fails, but inform about the files
         fileContents = files.map(f => ({
@@ -232,12 +215,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-
     // 4. Build OpenAI messages array
     const openaiMessages: { role: OpenAIMessageRole; content: string }[] = [
       { role: 'system', content: SYSTEM_PROMPT }
     ];
-
 
     // Add file contents if available - THIS WAS THE ISSUE! ⭐
     if (fileContents.length > 0) {
@@ -258,7 +239,6 @@ export async function POST(req: NextRequest) {
         }
       });
 
-
       // FIXED: Only add file content message if we actually have content
       if (fileContentText.trim()) {
         openaiMessages.push({
@@ -271,13 +251,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-
     // Add conversation messages
     openaiMessages.push(...messages.map(m => ({
       role: m.role as OpenAIMessageRole,
       content: m.content
     })));
-
 
     // 5. Get AI response
     console.log(`[ChatAPI] Sending ${openaiMessages.length} messages to OpenAI...`);
@@ -290,7 +268,6 @@ export async function POST(req: NextRequest) {
         console.log(`[ChatAPI] File content preview: ${msg.content.substring(0, 500)}...`);
       }
     });
-
 
     console.log(`[ChatAPI] File extraction results:`, JSON.stringify(fileContents.map(fc => ({
       name: fc.fileName,
@@ -306,16 +283,13 @@ export async function POST(req: NextRequest) {
       max_tokens: 4000,
     });
 
-
     const aiResponse = completion.choices[0]?.message?.content;
    
     if (!aiResponse) {
       throw new Error('Empty response from AI');
     }
 
-
     console.log(`[ChatAPI] AI response generated: ${aiResponse.length} characters`);
-
 
     // 6. Return response
     return NextResponse.json({
@@ -324,13 +298,11 @@ export async function POST(req: NextRequest) {
       successfulExtractions: fileContents.filter(f => f.success && f.content.trim()).length
     });
 
-
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[ChatAPI] Error:', err);
-    const status = err.status || 500;
-    const message = err.message || 'Internal server error';
+    const error = err as Error & { status?: number };
+    const status = error.status || 500;
+    const message = error.message || 'Internal server error';
     return NextResponse.json({ error: message }, { status });
   }
 }
-
-
