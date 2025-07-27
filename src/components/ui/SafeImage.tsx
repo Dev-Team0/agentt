@@ -1,7 +1,13 @@
-// +// File: src/components/ui/SafeImage.tsxy
+// File: src/components/ui/SafeImage.tsx
 'use client';
+
+
+
+
 import React, { useState } from 'react';
 import { Building2 } from 'lucide-react';
+
+
 
 
 interface SafeImageProps {
@@ -13,52 +19,40 @@ interface SafeImageProps {
 }
 
 
+
+
 export function SafeImage({
-  src = '/vb.png',
-  alt = 'VB Logo',
-  fallback = <Building2 className="w-8 h-8 text-gray-400" />,
-  className,
-  theme = 'light'
+  src,
+  alt,
+  fallback = <Building2 className="w-5 h-5" />,
+  className = '',
 }: SafeImageProps) {
   const [error, setError] = useState(false);
+
+
 
 
   const isValidSrc = src && (src.startsWith('/') || src.startsWith('http'));
 
 
+
+
   if (error || !isValidSrc) {
-    return <>{fallback}</>;
+    return <div className={className}>{fallback}</div>;
   }
 
 
-  // Add theme-aware styling for the logo
-  const getImageClasses = () => {
-    let classes = className || '';
-   
-    // Add background and border for better visibility across themes
-    if (theme === 'dark' || theme === 'very-dark') {
-      classes += ' bg-white p-1 rounded-md border border-gray-600';
-    } else {
-      classes += ' bg-white p-1 rounded-md border border-gray-200';
-    }
-   
-    return classes;
-  };
 
 
   return (
     <img
       src={src}
       alt={alt}
-      className={getImageClasses()}
+      className={className}
       onError={() => setError(true)}
     />
   );
 }
-
-
-
-
 
 
 

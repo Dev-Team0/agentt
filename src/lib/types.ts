@@ -5,7 +5,13 @@ export type Theme = 'light' | 'dark' | 'very-dark';
 export interface Message {
   role: 'user' | 'assistant';
   content: string;
-  timestamp?: string;
+  timestamp: string;
+  files?: {
+    name: string;
+    url: string;
+    type: string;
+    size: number;
+  }[];
 }
 
 
