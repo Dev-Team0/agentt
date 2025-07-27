@@ -1,20 +1,9 @@
-// components/ChatGPTStyleFileUpload.tsx
 'use client';
 
 import React, { useState, useRef, useCallback } from 'react';
 import { Paperclip, X, File, Image, FileText, Upload } from 'lucide-react';
 import { Theme } from '@/lib/types';
 import { getThemeClasses } from '@/lib/theme';
-
-interface SelectedFile {
-  id: string;
-  file: File;
-  name: string;
-  size: number;
-  type: string;
-  preview?: string;
-  error?: string;
-}
 
 interface ChatGPTStyleFileUploadProps {
   theme: Theme;
@@ -36,12 +25,6 @@ export const ChatGPTStyleFileUpload: React.FC<ChatGPTStyleFileUploadProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const themeClasses = getThemeClasses(theme);
-
-  const getFileIcon = (fileType: string) => {
-    if (fileType.startsWith('image/')) return <Image className="w-4 h-4 text-blue-500" />;
-    if (fileType.includes('pdf')) return <FileText className="w-4 h-4 text-red-500" />;
-    return <File className="w-4 h-4 text-gray-500" />;
-  };
 
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return bytes + ' B';

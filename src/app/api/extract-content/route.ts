@@ -1,19 +1,35 @@
-// src/app/api/extract-content/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import { FileContentExtractor } from '@/lib/fileProcessing';
 
-
 export const dynamic = 'force-dynamic';
-
 
 const SECRET = process.env.NEXTAUTH_SECRET!;
 
+interface FileToProcess {
+  name: string;
+  url: string;
+  type: string;
+  size: number;
+}
+
+interface ExtractRequest {
+  files: FileToProcess[];
+}
+
+interface ExtractedContent {
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  content: string;
+  metadata?: Record<string, unknown>;
+  error?: string;
+  success: boolean;
+}
 
 export async function POST(req: NextRequest) {
   try {
     console.log('[ExtractAPI] Starting file content extraction...');
-
 
     // 1. Authenticate user
     const token = await getToken({ req, secret: SECRET });
@@ -25,24 +41,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-
     console.log(`[ExtractAPI] Authenticated user: ${userId}`);
 
-
     // 2. Parse request body
-    const { files } = await req.json();
+    const { files } = await req.json() as ExtractRequest;
    
     if (!files || !Array.isArray(files) || files.length === 0) {
       console.log('[ExtractAPI] No files provided');
       return NextResponse.json({ error: 'No files provided' }, { status: 400 });
     }
 
-
     console.log(`[ExtractAPI] Received ${files.length} files to process`);
 
-
     // 3. Process each file
-    const extractedContents = [];
+    const extractedContents: ExtractedContent[] = [];
    
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
@@ -53,7 +65,6 @@ export async function POST(req: NextRequest) {
         type: file.type,
         size: file.size
       });
-
 
       try {
         const content = await FileContentExtractor.extractContent(file.url, file.type);
@@ -66,22 +77,21 @@ export async function POST(req: NextRequest) {
           success: true
         });
         console.log(`[ExtractAPI] Successfully extracted content from ${file.name}`);
-      } catch (error: any) {
-        console.error(`[ExtractAPI] Failed to extract content from ${file.name}:`, error);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error(`[ExtractAPI] Failed to extract content from ${file.name}:`, errorMessage);
         extractedContents.push({
           fileName: file.name,
           fileType: file.type,
           fileSize: file.size,
           content: '',
-          error: error.message,
+          error: errorMessage,
           success: false
         });
       }
     }
 
-
     console.log(`[ExtractAPI] Completed processing ${files.length} files`);
-
 
     return NextResponse.json({
       success: true,
@@ -89,14 +99,12 @@ export async function POST(req: NextRequest) {
       extractedContents: extractedContents
     });
 
-
-  } catch (error: any) {
-    console.error('[ExtractAPI] Processing error:', error);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[ExtractAPI] Processing error:', errorMessage);
     return NextResponse.json({
       error: 'Failed to process files',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
     }, { status: 500 });
   }
 }
-
-

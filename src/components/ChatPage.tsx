@@ -1,6 +1,5 @@
 'use client';
 
-
 import React, { useState, useRef, useEffect, ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Send, Menu, Building2, LogOut } from 'lucide-react';
@@ -14,6 +13,26 @@ import { ChatMessage } from './ChatMessage';
 import { TypingIndicator } from './TypingIndicator';
 import { ChatGPTStyleFileUpload } from '@/components/ChatGPTStyleFileUpload';
 
+interface FileData {
+  name: string;
+  url: string;
+  type: string;
+  size: number;
+}
+
+interface MessageWithFiles extends Message {
+  files?: FileData[];
+}
+
+interface ChatResponse {
+  content: string;
+  filesProcessed?: number;
+}
+
+interface ApiErrorResponse {
+  error?: string;
+  message?: string;
+}
 
 export default function ChatPage() {
   const router = useRouter();
@@ -29,11 +48,9 @@ export default function ChatPage() {
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
 
-
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const themeClasses = getThemeClasses(theme);
-
 
   // Helper function to format file sizes properly
   const formatFileSize = (bytes: number): string => {
@@ -47,7 +64,6 @@ export default function ChatPage() {
     return `${size} ${sizes[i]}`;
   };
 
-
   // Load theme from localStorage
   useEffect(() => {
     const saved = localStorage.getItem('vb-theme') as Theme;
@@ -56,12 +72,10 @@ export default function ChatPage() {
     }
   }, []);
 
-
   const handleThemeChange = (newTheme: Theme) => {
     setTheme(newTheme);
     localStorage.setItem('vb-theme', newTheme);
   };
-
 
   // Authentication check
   useEffect(() => {
@@ -83,7 +97,6 @@ export default function ChatPage() {
     })();
   }, [router]);
 
-
   // Admin role check
   useEffect(() => {
     (async () => {
@@ -97,7 +110,6 @@ export default function ChatPage() {
     })();
   }, []);
 
-
   // Listen for auth storage change
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
@@ -108,7 +120,6 @@ export default function ChatPage() {
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, [router]);
-
 
   // Load conversations
   useEffect(() => {
@@ -129,12 +140,10 @@ export default function ChatPage() {
     })();
   }, []);
 
-
   // Scroll to bottom on new message
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
 
   // Auto-focus textarea
   useEffect(() => {
@@ -142,12 +151,10 @@ export default function ChatPage() {
     return () => clearTimeout(timer);
   }, [messages, isLoading]);
 
-
   const generateConversationTitle = (text: string) => {
     const words = text.split(' ').slice(0, 4).join(' ');
     return words.length > 30 ? words.substring(0, 30) + '...' : words;
   };
-
 
   const createNewConversation = () => {
     setCurrentConversationId(null);
@@ -162,7 +169,6 @@ export default function ChatPage() {
     setSidebarOpen(false);
   };
 
-
   const selectConversation = (id: string) => {
     const conv = conversations.find((c) => c.id === id);
     if (conv) {
@@ -173,28 +179,23 @@ export default function ChatPage() {
     }
   };
 
-
   const updateConversationMessages = (id: string, newMsgs: Message[]) => {
     setConversations((prev) =>
       prev.map((conv) => (conv.id === id ? { ...conv, messages: newMsgs, time: 'Just now' } : conv))
     );
   };
 
-
   const sendFeedback = (msg: Message, fb: 'helpful' | 'not-helpful') => {
     console.log(`Feedback: ${fb} for message:`, msg);
   };
-
 
   const handleFilesSelected = (files: File[]) => {
     setUploadedFiles((prev) => [...prev, ...files]);
   };
 
-
   const removeFile = (index: number) => {
     setUploadedFiles((prev) => prev.filter((_, i) => i !== index));
   };
-
 
   const handleInputChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
@@ -203,11 +204,9 @@ export default function ChatPage() {
     ta.style.height = Math.min(ta.scrollHeight, 200) + 'px';
   };
 
-
   // Handle paste events for files
   const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     if (isLoading) return;
-
 
     const clipboardData = e.clipboardData;
     const items = Array.from(clipboardData.items);
@@ -246,7 +245,6 @@ export default function ChatPage() {
     // If no files, let the default paste behavior handle text
   };
 
-
   // Updated sendMessage function with file content extraction
   const sendMessage = async (messageText?: string): Promise<void> => {
     const text = messageText ?? input;
@@ -254,16 +252,13 @@ export default function ChatPage() {
    
     if (!text.trim() && filesToSend.length === 0) return;
 
-
-    let userMessage: Message = {
+    const userMessage: Message = {
       role: 'user',
       content: text,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
-
-    let uploadedFileData: Array<{ name: string; url: string; type: string; size: number }> = [];
-
+    const uploadedFileData: FileData[] = [];
 
     // Step 1: Upload files if any
     if (filesToSend.length > 0) {
@@ -286,7 +281,7 @@ export default function ChatPage() {
           if (!res.ok) {
             let errorMessage = `Failed to upload ${file.name} (${res.status} ${res.statusText})`;
             try {
-              const errorData = await res.json();
+              const errorData: ApiErrorResponse = await res.json();
               console.error('Upload error details:', errorData);
               errorMessage = `Upload failed: ${errorData.error || errorMessage}`;
             } catch (parseError) {
@@ -306,9 +301,7 @@ export default function ChatPage() {
           });
         }
 
-
         console.log(`Successfully uploaded ${uploadedFileData.length} files`);
-
 
         // Update user message to show file attachments
         if (!text.trim()) {
@@ -321,25 +314,25 @@ export default function ChatPage() {
           userMessage.content = `${text}\n\n📎 Files: ${uploadedFileData.map(f => f.name).join(', ')}`;
         }
 
-
         // Store file data in message for UI display
-        (userMessage as any).files = uploadedFileData;
+        (userMessage as MessageWithFiles).files = uploadedFileData;
 
-
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('File upload error details:', err);
        
         // Show more helpful error message to user
         let userErrorMessage = 'File upload failed. ';
+        
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
        
-        if (err.message.includes('413')) {
+        if (errorMessage.includes('413')) {
           userErrorMessage += 'File is too large. Please try a smaller file.';
-        } else if (err.message.includes('415')) {
+        } else if (errorMessage.includes('415')) {
           userErrorMessage += 'File type not supported. Please try PDF, Word, or image files.';
-        } else if (err.message.includes('401')) {
+        } else if (errorMessage.includes('401')) {
           userErrorMessage += 'Please log in again and try uploading.';
         } else {
-          userErrorMessage += err.message;
+          userErrorMessage += errorMessage;
         }
        
         setMessages((prev) => [
@@ -354,7 +347,6 @@ export default function ChatPage() {
       }
     }
 
-
     // Step 2: Add user message to chat
     const newMsgs = [...messages, userMessage];
     setMessages(newMsgs);
@@ -362,14 +354,11 @@ export default function ChatPage() {
     setUploadedFiles([]);
     setIsLoading(true);
 
-
     const title = generateConversationTitle(text || uploadedFileData.map(f => f.name).join(', '));
     let finalMsgs = [...newMsgs];
 
-
     try {
       console.log('Sending message to AI with files:', uploadedFileData.length);
-
 
       // Step 3: Send to chat API (which will handle file content extraction)
       const res = await fetch('/api/chat', {
@@ -388,26 +377,24 @@ export default function ChatPage() {
         }),
       });
 
-
       if (!res.ok) {
         let errorMessage = 'Failed to get AI response';
         try {
-          const errorData = await res.json();
+          const errorData: ApiErrorResponse = await res.json();
           errorMessage = errorData.error || errorData.message || errorMessage;
-        } catch {}
+        } catch {
+          // Error parsing response, use default message
+        }
         throw new Error(errorMessage);
       }
 
-
-      const data = await res.json();
+      const data: ChatResponse = await res.json();
      
       if (!data.content) {
         throw new Error('No content received from AI');
       }
 
-
       console.log(`AI response received. Files processed: ${data.filesProcessed || 0}`);
-
 
       // Step 4: Add AI response to chat
       const aiMessage: Message = {
@@ -416,22 +403,20 @@ export default function ChatPage() {
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
-
       finalMsgs = [...newMsgs, aiMessage];
       setMessages(finalMsgs);
 
-
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Chat error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
       const errorMsg: Message = {
         role: 'assistant',
-        content: `❌ Sorry, I encountered an error: ${err.message}. Please try again or contact support if the issue persists.`,
+        content: `❌ Sorry, I encountered an error: ${errorMessage}. Please try again or contact support if the issue persists.`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
       finalMsgs = [...newMsgs, errorMsg];
       setMessages(finalMsgs);
     }
-
 
     // Step 5: Save conversation
     try {
@@ -460,7 +445,6 @@ export default function ChatPage() {
     }
   };
 
-
   const handleLogout = async () => {
     try {
       await fetch('/api/logout', { method: 'POST' });
@@ -471,7 +455,6 @@ export default function ChatPage() {
       console.error('Logout failed:', err);
     }
   };
-
 
   const handleDeleteConversation = async (id: string) => {
     try {
@@ -488,7 +471,6 @@ export default function ChatPage() {
     }
   };
 
-
   if (isAuthChecking) {
     return (
       <div className={`flex items-center justify-center h-screen ${themeClasses.bg} ${themeClasses.text}`}>        
@@ -499,7 +481,6 @@ export default function ChatPage() {
       </div>
     );
   }
-
 
   return (
     <div className={`h-screen flex ${themeClasses.bg}`}>
@@ -515,14 +496,12 @@ export default function ChatPage() {
         theme={theme}
       />
 
-
       <SettingsModal
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
         theme={theme}
         onThemeChange={handleThemeChange}
       />
-
 
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header - Mobile Optimized */}
@@ -569,7 +548,6 @@ export default function ChatPage() {
           </div>
         </header>
 
-
         {/* Main Content - Mobile Optimized */}
         <div className="flex-1 overflow-y-auto px-3 sm:px-6 py-3 sm:py-6 space-y-0">
           <div className="max-w-4xl mx-auto">
@@ -580,7 +558,6 @@ export default function ChatPage() {
             <div ref={messagesEndRef} />
           </div>
         </div>
-
 
         {/* Chat Input Section - Mobile Optimized */}
         <div className={`border-t px-3 sm:px-6 py-3 sm:py-4 ${themeClasses.cardBg} ${themeClasses.border}`}>
@@ -694,4 +671,3 @@ export default function ChatPage() {
     </div>
   );
 }
-

@@ -1,8 +1,6 @@
-// lib/fileProcessing.ts - Safe version with proper error handling
 import { readFile, stat } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
-
 
 interface ExtractedContent {
   text: string;
@@ -17,6 +15,26 @@ interface ExtractedContent {
   };
 }
 
+interface PDFParseResult {
+  text: string;
+  numpages: number;
+}
+
+interface MammothResult {
+  value: string;
+}
+
+interface TesseractResult {
+  data: {
+    text: string;
+    confidence: number;
+  };
+}
+
+interface TesseractLogger {
+  status: string;
+  progress: number;
+}
 
 export class FileContentExtractor {
   // Extract text from PDF files
@@ -24,7 +42,7 @@ export class FileContentExtractor {
     try {
       const pdf = await import('pdf-parse');
       const dataBuffer = await readFile(filePath);
-      const data = await pdf.default(dataBuffer);
+      const data = await pdf.default(dataBuffer) as PDFParseResult;
      
       return {
         text: data.text.trim(),
@@ -34,19 +52,19 @@ export class FileContentExtractor {
           type: 'pdf'
         }
       };
-    } catch (error: any) {
-      console.error('PDF extraction error:', error);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('PDF extraction error:', errorMessage);
       throw new Error('Failed to extract text from PDF');
     }
   }
-
 
   // Extract text from DOCX files
   static async extractFromDOCX(filePath: string): Promise<ExtractedContent> {
     try {
       const mammoth = await import('mammoth');
       const dataBuffer = await readFile(filePath);
-      const result = await mammoth.extractRawText({ buffer: dataBuffer });
+      const result = await mammoth.extractRawText({ buffer: dataBuffer }) as MammothResult;
      
       return {
         text: result.value.trim(),
@@ -55,19 +73,19 @@ export class FileContentExtractor {
           type: 'docx'
         }
       };
-    } catch (error: any) {
-      console.error('DOCX extraction error:', error);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('DOCX extraction error:', errorMessage);
       throw new Error('Failed to extract text from DOCX');
     }
   }
-
 
   // Extract text from DOC files (legacy Word format)
   static async extractFromDOC(filePath: string): Promise<ExtractedContent> {
     try {
       const mammoth = await import('mammoth');
       const dataBuffer = await readFile(filePath);
-      const result = await mammoth.extractRawText({ buffer: dataBuffer });
+      const result = await mammoth.extractRawText({ buffer: dataBuffer }) as MammothResult;
      
       return {
         text: result.value.trim() || 'Could not extract text from legacy DOC format. Please convert to DOCX.',
@@ -75,15 +93,15 @@ export class FileContentExtractor {
           type: 'doc'
         }
       };
-    } catch (error: any) {
-      console.error('DOC extraction error:', error);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('DOC extraction error:', errorMessage);
       return {
         text: 'Unable to extract text from legacy DOC format. Please convert to DOCX or PDF.',
-        metadata: { type: 'doc', error: error.message }
+        metadata: { type: 'doc', error: errorMessage }
       };
     }
   }
-
 
   // Extract text from plain text files
   static async extractFromTXT(filePath: string): Promise<ExtractedContent> {
@@ -97,12 +115,12 @@ export class FileContentExtractor {
           type: 'txt'
         }
       };
-    } catch (error: any) {
-      console.error('TXT extraction error:', error);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('TXT extraction error:', errorMessage);
       throw new Error('Failed to read text file');
     }
   }
-
 
   // Safe image processing with multiple fallback options
   static async extractFromImage(filePath: string): Promise<ExtractedContent> {
@@ -118,42 +136,41 @@ export class FileContentExtractor {
         try {
           console.log(`[FileExtractor] Attempting Vision API analysis...`);
           return await this.analyzeImageWithVisionAPI(filePath, stats.size);
-        } catch (visionError: any) {
-          console.warn(`[FileExtractor] Vision API failed: ${visionError.message}`);
+        } catch (visionError) {
+          const errorMessage = visionError instanceof Error ? visionError.message : 'Unknown error';
+          console.warn(`[FileExtractor] Vision API failed: ${errorMessage}`);
           // Continue to OCR fallback
         }
       }
-
 
       // Fallback to OCR if Vision API fails or isn't available
       try {
         console.log(`[FileExtractor] Attempting OCR analysis...`);
         return await this.extractTextWithOCR(filePath, stats.size);
-      } catch (ocrError: any) {
-        console.warn(`[FileExtractor] OCR failed: ${ocrError.message}`);
+      } catch (ocrError) {
+        const errorMessage = ocrError instanceof Error ? ocrError.message : 'Unknown error';
+        console.warn(`[FileExtractor] OCR failed: ${errorMessage}`);
         // Continue to basic fallback
       }
-
 
       // Final fallback - basic image info
       console.log(`[FileExtractor] Using basic image info fallback...`);
       return this.getBasicImageInfo(fileName, stats.size);
 
-
-    } catch (error: any) {
-      console.error(`[FileExtractor] All image processing methods failed:`, error);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error(`[FileExtractor] All image processing methods failed:`, errorMessage);
      
       return {
         text: 'I can see that you\'ve uploaded an image file, but I\'m unable to process it at the moment. Please describe what you see in the image, and I\'ll be happy to help with any questions or analysis.',
         metadata: {
           type: 'image',
           processing: 'all_methods_failed',
-          error: error.message
+          error: errorMessage
         }
       };
     }
   }
-
 
   // Vision API analysis (with timeout and error handling)
   static async analyzeImageWithVisionAPI(filePath: string, fileSize: number): Promise<ExtractedContent> {
@@ -163,7 +180,6 @@ export class FileContentExtractor {
       apiKey: process.env.OPENAI_API_KEY,
       timeout: 30000 // 30 second timeout
     });
-
 
     // Read and encode image
     const imageBuffer = await readFile(filePath);
@@ -177,7 +193,6 @@ export class FileContentExtractor {
       'webp': 'image/webp',
       'gif': 'image/gif'
     }[extension || 'jpg'] || 'image/jpeg';
-
 
     // Call Vision API with timeout
     const response = await openai.chat.completions.create({
@@ -204,13 +219,11 @@ export class FileContentExtractor {
       temperature: 0.3
     });
 
-
     const description = response.choices[0]?.message?.content;
    
     if (!description) {
       throw new Error('Empty response from Vision API');
     }
-
 
     return {
       text: description.trim(),
@@ -223,27 +236,26 @@ export class FileContentExtractor {
     };
   }
 
-
   // OCR analysis fallback
   static async extractTextWithOCR(filePath: string, fileSize: number): Promise<ExtractedContent> {
     const Tesseract = await import('tesseract.js');
    
-    const { data: { text, confidence } } = await Tesseract.recognize(filePath, 'eng', {
-      logger: (m: any) => {
+    const result = await Tesseract.recognize(filePath, 'eng', {
+      logger: (m: TesseractLogger) => {
         if (m.status === 'recognizing text' && m.progress % 0.2 < 0.1) {
           console.log(`[FileExtractor] OCR Progress: ${Math.round(m.progress * 100)}%`);
         }
       }
-    });
+    }) as TesseractResult;
    
-    const extractedText = text.trim();
+    const extractedText = result.data.text.trim();
    
     if (!extractedText) {
       return {
         text: 'This image does not appear to contain readable text. The image has been uploaded successfully, but no text content was detected through OCR analysis.',
         metadata: {
           type: 'image',
-          confidence: confidence,
+          confidence: result.data.confidence,
           processing: 'ocr_no_text_found',
           originalSize: fileSize
         }
@@ -255,13 +267,12 @@ export class FileContentExtractor {
       metadata: {
         wordCount: extractedText.split(/\s+/).length,
         type: 'image',
-        confidence: Math.round(confidence),
+        confidence: Math.round(result.data.confidence),
         processing: 'ocr_success',
         originalSize: fileSize
       }
     };
   }
-
 
   // Basic image info fallback
   static getBasicImageInfo(fileName: string, fileSize: number): ExtractedContent {
@@ -277,7 +288,6 @@ export class FileContentExtractor {
       }
     };
   }
-
 
   // Main extraction method with comprehensive error handling
   static async extractContent(fileUrl: string, mimeType: string): Promise<ExtractedContent> {
@@ -321,11 +331,10 @@ export class FileContentExtractor {
         default:
           throw new Error(`Unsupported file type: ${mimeType}`);
       }
-    } catch (error: any) {
-      console.error(`[FileExtractor] Processing error:`, error);
-      throw new Error(`Failed to process ${mimeType}: ${error.message}`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error(`[FileExtractor] Processing error:`, errorMessage);
+      throw new Error(`Failed to process ${mimeType}: ${errorMessage}`);
     }
   }
 }
-
-

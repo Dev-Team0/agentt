@@ -1,14 +1,25 @@
-// src/components/ChatMessage.tsx - Improved version
+// src/components/ChatMessage.tsx - Fixed version
 
 'use client';
 
-import React, { JSX } from 'react';
+import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Message } from '@/lib/types';
 import { getThemeClasses, Theme } from '@/lib/theme';
 import { SafeImage } from '@/components/ui/SafeImage';
 import { User, ThumbsUp, ThumbsDown, Clipboard, File, Image as ImageIcon, FileText, Download } from 'lucide-react';
 import Image from 'next/image';
+
+interface FileData {
+  name: string;
+  url: string;
+  type: string;
+  size: number;
+}
+
+interface MessageWithFiles extends Message {
+  files?: FileData[];
+}
 
 interface ChatMessageProps {
   message: Message;
@@ -29,15 +40,15 @@ export function ChatMessage({ message, theme, onFeedback }: ChatMessageProps) {
 
   // Enhanced file rendering
   const renderFiles = () => {
-    const files = (message as any).files;
+    const messageWithFiles = message as MessageWithFiles;
+    const files = messageWithFiles.files;
     if (!files || files.length === 0) return null;
 
     return (
       <div className="mt-3 space-y-2">
-        {files.map((file: any, index: number) => {
+        {files.map((file: FileData, index: number) => {
           const isImage = file.type.startsWith('image/');
           const isPdf = file.type === 'application/pdf';
-          const isDoc = file.type.includes('document') || file.type.includes('word');
           
           return (
             <div key={index} className={`
@@ -112,7 +123,8 @@ export function ChatMessage({ message, theme, onFeedback }: ChatMessageProps) {
     if (!isAssistant) {
       cleanContent = cleanContent.replace(/📎\s+[^\n]+/g, '').trim();
       // If content is empty after removing file indicators, show a default message
-      if (!cleanContent && (message as any).files?.length > 0) {
+      const messageWithFiles = message as MessageWithFiles;
+      if (!cleanContent && messageWithFiles.files && messageWithFiles.files.length > 0) {
         return null; // Don't show empty content, just show files
       }
     }
@@ -189,7 +201,8 @@ export function ChatMessage({ message, theme, onFeedback }: ChatMessageProps) {
     }
   };
 
-  const hasFiles = (message as any).files?.length > 0;
+  const messageWithFiles = message as MessageWithFiles;
+  const hasFiles = messageWithFiles.files && messageWithFiles.files.length > 0;
   const hasContent = renderCleanContent();
 
   return (
