@@ -2,7 +2,7 @@
 
 'use client';
 
-import React from 'react';
+import React, { JSX, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Message } from '@/lib/types';
 import { getThemeClasses, Theme } from '@/lib/theme';
@@ -30,13 +30,20 @@ interface ChatMessageProps {
 export function ChatMessage({ message, theme, onFeedback }: ChatMessageProps) {
   const themeClasses = getThemeClasses(theme);
   const isAssistant = message.role === 'assistant';
+  const [copied, setCopied] = useState(false);
+  
+
 
   // Copy handler
-  const copyToClipboard = () => {
+   const copyToClipboard = () => {
     if (typeof window !== 'undefined') {
       navigator.clipboard.writeText(message.content);
+      setCopied(true);
+      // Reset the copied state after 2 seconds
+      setTimeout(() => setCopied(false), 2000);
     }
   };
+
 
   // Enhanced file rendering
   const renderFiles = () => {
@@ -270,14 +277,18 @@ export function ChatMessage({ message, theme, onFeedback }: ChatMessageProps) {
                 )}
               </div>
 
-              {/* Copy button on right */}
-              <button
-                onClick={copyToClipboard}
-                className="p-1 rounded hover:bg-gray-100"
-                aria-label="Copy response"
-              >
+               <button
+              onClick={copyToClipboard}
+              className="p-1 rounded hover:bg-gray-100 flex items-center gap-1"
+              aria-label={copied ? "Copied!" : "Copy response"}
+            >
+              {copied ? (
+                <span className="text-xs text-green-600 font-medium">Copied!</span>
+              ) : (
                 <Clipboard className="w-4 h-4 text-gray-500 hover:text-gray-700" />
-              </button>
+              )}
+            </button>
+
             </div>
           </div>
         )}
