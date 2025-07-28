@@ -634,7 +634,7 @@ export default function ChatPage() {
                       handleFilesSelected(files);
                     }
                   }}
-                  placeholder={uploadedFiles.length > 0 ? "Ask about your files or add more context..." : "Type your message, upload files, or paste files (Ctrl+V) to analyze..."}
+                  placeholder={uploadedFiles.length > 0 ? "Ask about your files or add more context..." : "Type your message..."}
                   disabled={isLoading}
                 />
                
@@ -663,7 +663,7 @@ export default function ChatPage() {
               </button>
             </div>
             <p className={`text-xs mt-2 text-center ${themeClasses.textMuted} px-2`}>
-              Upload PDFs, Word docs, images, or text files for AI analysis. Supports OCR for images with text. You can also paste files directly with Ctrl+V (Cmd+V on Mac).
+              Upload PDFs, Word docs, images, or text files for AI analysis. 
             </p>
           </div>
         </div>

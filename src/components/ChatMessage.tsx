@@ -2,7 +2,7 @@
 
 'use client';
 
-import React, { JSX, useState } from 'react';
+import React, {  useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Message } from '@/lib/types';
 import { getThemeClasses, Theme } from '@/lib/theme';
