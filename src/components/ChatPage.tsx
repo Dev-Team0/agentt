@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, ChangeEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { Send, Menu, Building2, LogOut } from 'lucide-react';
+import { Send, Menu, Building2 } from 'lucide-react';
 import { Conversation, Message, Theme } from '@/lib/types';
 import { SafeImage } from '@/components/ui/SafeImage';
 import { getThemeClasses } from '@/lib/theme';
@@ -55,11 +55,11 @@ export default function ChatPage() {
   // Helper function to format file sizes properly
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 B';
-   
+
     const k = 1024;
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-   
+
     const size = parseFloat((bytes / Math.pow(k, i)).toFixed(1));
     return `${size} ${sizes[i]}`;
   };
@@ -210,32 +210,32 @@ export default function ChatPage() {
 
     const clipboardData = e.clipboardData;
     const items = Array.from(clipboardData.items);
-   
+
     // Check if there are files in the clipboard
     const fileItems = items.filter(item => item.kind === 'file');
-   
+
     if (fileItems.length > 0) {
       e.preventDefault(); // Prevent default paste behavior for files
-     
+
       const files: File[] = [];
-     
+
       for (const item of fileItems) {
         const file = item.getAsFile();
         if (file) {
           files.push(file);
         }
       }
-     
+
       if (files.length > 0) {
         console.log(`Pasted ${files.length} file(s):`, files.map(f => f.name));
         handleFilesSelected(files);
-       
+
         // Optional: Show a brief notification
         const notification = document.createElement('div');
         notification.textContent = `${files.length} file(s) pasted successfully!`;
         notification.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity';
         document.body.appendChild(notification);
-       
+
         setTimeout(() => {
           notification.style.opacity = '0';
           setTimeout(() => document.body.removeChild(notification), 300);
@@ -249,7 +249,7 @@ export default function ChatPage() {
   const sendMessage = async (messageText?: string): Promise<void> => {
     const text = messageText ?? input;
     const filesToSend = [...uploadedFiles];
-   
+
     if (!text.trim() && filesToSend.length === 0) return;
 
     const userMessage: Message = {
@@ -264,20 +264,20 @@ export default function ChatPage() {
     if (filesToSend.length > 0) {
       try {
         console.log(`Uploading ${filesToSend.length} files...`);
-       
+
         for (const file of filesToSend) {
           console.log(`Uploading file: ${file.name}, size: ${file.size}, type: ${file.type}`);
-         
+
           const fd = new FormData();
           fd.append('file', file);
-         
+
           const res = await fetch('/api/upload', {
             method: 'POST',
             body: fd
           });
-         
+
           console.log(`Upload response status: ${res.status} ${res.statusText}`);
-         
+
           if (!res.ok) {
             let errorMessage = `Failed to upload ${file.name} (${res.status} ${res.statusText})`;
             try {
@@ -289,10 +289,10 @@ export default function ChatPage() {
             }
             throw new Error(errorMessage);
           }
-         
+
           const uploadResult = await res.json();
           console.log(`Successfully uploaded: ${file.name} -> ${uploadResult.url}`);
-         
+
           uploadedFileData.push({
             name: file.name,
             url: uploadResult.url,
@@ -319,12 +319,12 @@ export default function ChatPage() {
 
       } catch (err: unknown) {
         console.error('File upload error details:', err);
-       
+
         // Show more helpful error message to user
         let userErrorMessage = 'File upload failed. ';
-        
+
         const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-       
+
         if (errorMessage.includes('413')) {
           userErrorMessage += 'File is too large. Please try a smaller file.';
         } else if (errorMessage.includes('415')) {
@@ -334,7 +334,7 @@ export default function ChatPage() {
         } else {
           userErrorMessage += errorMessage;
         }
-       
+
         setMessages((prev) => [
           ...prev,
           {
@@ -389,7 +389,7 @@ export default function ChatPage() {
       }
 
       const data: ChatResponse = await res.json();
-     
+
       if (!data.content) {
         throw new Error('No content received from AI');
       }
@@ -473,7 +473,7 @@ export default function ChatPage() {
 
   if (isAuthChecking) {
     return (
-      <div className={`flex items-center justify-center h-screen ${themeClasses.bg} ${themeClasses.text}`}>        
+      <div className={`flex items-center justify-center h-screen ${themeClasses.bg} ${themeClasses.text}`}>
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto mb-4"></div>
           <p>Loading...</p>
@@ -494,6 +494,8 @@ export default function ChatPage() {
         currentConversationId={currentConversationId}
         onShowSettings={() => setShowSettings(true)}
         theme={theme}
+        isAdmin={isAdmin}
+        handleLogout={handleLogout}
       />
 
       <SettingsModal
@@ -503,18 +505,22 @@ export default function ChatPage() {
         onThemeChange={handleThemeChange}
       />
 
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Header - Mobile Optimized */}
+      <div className="flex-1 flex flex-col min-w-0 md:ml-80">
+        {/* Streamlined Header - No duplicate logo/status on desktop */}
         <header className={`border-b px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between shadow-sm ${themeClasses.cardBg} ${themeClasses.border}`}>
           <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+            {/* Sidebar toggle - only visible on mobile */}
             <button
               onClick={() => setSidebarOpen(true)}
-              className={`p-2 rounded-lg transition-colors ${themeClasses.hoverSecondary} ${themeClasses.focus}`}
+              className={`p-2 rounded-lg transition-colors cursor-pointer ${themeClasses.hoverSecondary} ${themeClasses.focus} md:hidden`}
               type="button"
+              aria-label="Open sidebar"
             >
               <Menu className={`w-5 h-5 ${themeClasses.textMuted}`} />
             </button>
-            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            
+            {/* Mobile-only logo and title - hidden on desktop since it's in sidebar */}
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0 md:hidden">
               <SafeImage
                 src="/vb.png"
                 alt="VB Capital"
@@ -524,27 +530,25 @@ export default function ChatPage() {
               />
               <div className="min-w-0">
                 <h1 className={`font-semibold text-sm sm:text-base truncate ${themeClasses.text}`}>VB Capital Assistant</h1>
-                <div className="text-xs sm:text-sm text-green-600 flex items-center gap-1">
-                  <span className="hidden sm:inline">Online</span>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                    <span className="text-xs sm:text-sm text-green-600 font-medium">Online</span>
+                  </div>
                 </div>
               </div>
             </div>
+            
+            {/* Desktop title - simple and clean */}
+            <div className="hidden md:block">
+              <h1 className={`text-lg font-semibold ${themeClasses.text}`}>Chat Assistant</h1>
+              <p className={`text-sm ${themeClasses.textMuted} mt-1`}>Ready to help you with any questions</p>
+            </div>
           </div>
+          
+          {/* Right side - now empty since admin/logout moved to sidebar */}
           <div className="flex items-center gap-1 sm:gap-2">
-            {isAdmin && (
-              <button
-                onClick={() => router.push('/admin')}
-                className={`text-xs sm:text-sm px-2 sm:px-4 py-1 sm:py-2 rounded-lg transition-colors ${themeClasses.buttonSecondary} ${themeClasses.text}`}>
-                Admin
-              </button>
-            )}
-            <button
-              onClick={handleLogout}
-              className="text-xs sm:text-sm px-2 sm:px-4 py-1 sm:py-2 rounded-lg bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white flex items-center gap-1 sm:gap-2 transition-colors shadow"
-            >
-              <LogOut className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">Logout</span>
-            </button>
+            {/* Future: Add search, notifications, or other quick actions here */}
           </div>
         </header>
 
@@ -563,59 +567,69 @@ export default function ChatPage() {
         <div className={`border-t px-3 sm:px-6 py-3 sm:py-4 ${themeClasses.cardBg} ${themeClasses.border}`}>
           <div className="max-w-4xl mx-auto">
             {messages.length <= 1 && (
-              <div className="mb-3 sm:mb-4">
+              <div className="mb-4 animate-in slide-in-from-bottom-2 duration-500">
                 <QuestionSuggestions onSelectQuestion={sendMessage} conversations={conversations} theme={theme} />
               </div>
             )}
-           
+
             {/* File previews above textarea */}
             {uploadedFiles.length > 0 && (
-              <div className="mb-3 space-y-2">
+              <div className="mb-4 space-y-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={`text-sm font-medium ${themeClasses.text}`}>📎 Attached Files:</span>
+                  <span className={`text-xs ${themeClasses.textMuted}`}>({uploadedFiles.length})</span>
+                </div>
                 {uploadedFiles.map((file, index) => (
                   <div
                     key={index}
-                    className={`flex items-center justify-between px-4 py-3 rounded-lg ${themeClasses.cardBg} ${themeClasses.border}`}
+                    className={`flex items-center justify-between p-4 rounded-xl border-2 border-dashed ${themeClasses.border} ${themeClasses.cardBg} hover:border-emerald-300 transition-all duration-200`}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${file.type.startsWith('image/') ? 'bg-blue-50 dark:bg-blue-900/20' :
+                          file.type === 'application/pdf' ? 'bg-red-50 dark:bg-red-900/20' :
+                            file.type.includes('word') ? 'bg-green-50 dark:bg-green-900/20' :
+                              'bg-gray-50 dark:bg-gray-700'
+                        }`}>
                         {file.type.startsWith('image/') ? (
-                          <span className="text-lg">🖼️</span>
+                          <span className="text-xl">🖼️</span>
                         ) : file.type === 'application/pdf' ? (
-                          <span className="text-lg">📄</span>
+                          <span className="text-xl">📄</span>
                         ) : file.type.includes('word') ? (
-                          <span className="text-lg">📝</span>
+                          <span className="text-xl">📝</span>
                         ) : (
-                          <span className="text-lg">📎</span>
+                          <span className="text-xl">📎</span>
                         )}
                       </div>
                       <div>
-                        <div className={`font-medium text-sm ${themeClasses.text}`}>{file.name}</div>
-                        <div className={`text-xs ${themeClasses.textMuted}`}>
-                          {formatFileSize(file.size)} • {file.type.split('/')[1]?.toUpperCase()}
+                        <div className={`font-semibold text-sm ${themeClasses.text} max-w-[200px] truncate`}>{file.name}</div>
+                        <div className={`text-xs ${themeClasses.textMuted} mt-1`}>
+                          {formatFileSize(file.size)} • {file.type.split('/')[1]?.toUpperCase() || 'Unknown'}
                         </div>
                       </div>
                     </div>
                     <button
                       onClick={() => removeFile(index)}
-                      className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-50 transition-colors"
+                      className="text-red-500 hover:text-red-700 p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors cursor-pointer"
                       title="Remove file"
                     >
-                      ×
+                      <span className="text-lg">×</span>
                     </button>
                   </div>
                 ))}
               </div>
             )}
-           
-            <div className="flex gap-2 sm:gap-3 items-end">
+
+            <div className="flex gap-3 items-end">
               <div className="flex-1 relative">
                 <textarea
                   ref={inputRef}
                   className={`
-                    w-full p-4 pr-16 border-1 rounded-2xl resize-none focus:outline-none transition-colors text-sm sm:text-base
+                    w-full p-4 pr-20 border-2 rounded-2xl resize-none focus:outline-none transition-all duration-200 text-sm sm:text-base
                     min-h-[56px] max-h-[160px] overflow-hidden sm:overflow-y-auto
-                    ${themeClasses.inputBg} ${themeClasses.text} focus:border-green-400 focus:ring-2 focus:ring-green-200
-                    placeholder-gray-500
+                    ${themeClasses.inputBg} ${themeClasses.text} focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 dark:focus:ring-emerald-900/20
+                    placeholder-gray-500 dark:placeholder-gray-400
+                    ${uploadedFiles.length > 0 ? 'border-emerald-200 dark:border-emerald-700' : ''}
+                    hover:border-emerald-300 dark:hover:border-emerald-600
                   `}
                   value={input}
                   onChange={handleInputChange}
@@ -626,18 +640,25 @@ export default function ChatPage() {
                     }
                   }}
                   onPaste={handlePaste}
-                  onDragOver={(e) => e.preventDefault()}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.currentTarget.classList.add('border-emerald-400', 'bg-emerald-50', 'dark:bg-emerald-900/10');
+                  }}
+                  onDragLeave={(e) => {
+                    e.currentTarget.classList.remove('border-emerald-400', 'bg-emerald-50', 'dark:bg-emerald-900/10');
+                  }}
                   onDrop={(e) => {
                     e.preventDefault();
+                    e.currentTarget.classList.remove('border-emerald-400', 'bg-emerald-50', 'dark:bg-emerald-900/10');
                     if (!isLoading) {
                       const files = Array.from(e.dataTransfer.files);
                       handleFilesSelected(files);
                     }
                   }}
-                  placeholder={uploadedFiles.length > 0 ? "Ask about your files or add more context..." : "Type your message..."}
+                  placeholder={uploadedFiles.length > 0 ? "Ask about your files or add more context..." : "Type your message or drag & drop files here..."}
                   disabled={isLoading}
                 />
-               
+
                 {/* File upload component inside textarea - positioned on the right */}
                 <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
                   <ChatGPTStyleFileUpload
@@ -652,18 +673,18 @@ export default function ChatPage() {
               <button
                 onClick={() => sendMessage()}
                 disabled={(!input.trim() && uploadedFiles.length === 0) || isLoading}
-                className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 disabled:from-gray-300 disabled:to-gray-400 text-white p-3 sm:p-4 rounded-xl sm:rounded-2xl transition-all duration-200 shadow-lg hover:shadow-xl disabled:shadow-none flex items-center justify-center min-w-[48px] sm:min-w-[56px]"
+                className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 disabled:from-gray-300 disabled:to-gray-400 text-white p-4 rounded-2xl transition-all duration-200 shadow-lg hover:shadow-xl disabled:shadow-none flex items-center justify-center min-w-[56px] h-[56px] group cursor-pointer"
                 title={isLoading ? "Processing..." : "Send message"}
               >
                 {isLoading ? (
-                  <div className="animate-spin rounded-full h-4 w-4 sm:h-5 sm:w-5 border-b-2 border-white"></div>
+                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
                 ) : (
-                  <Send className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <Send className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
                 )}
               </button>
             </div>
             <p className={`text-xs mt-2 text-center ${themeClasses.textMuted} px-2`}>
-              Upload PDFs, Word docs, images, or text files for AI analysis. 
+              Upload PDFs, Word docs, images, or text files for AI analysis.
             </p>
           </div>
         </div>

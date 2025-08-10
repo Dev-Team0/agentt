@@ -3,232 +3,350 @@
 
 'use client';
 import { useState, useEffect } from 'react';
-import { X, MessageSquare, Settings, Trash2 } from 'lucide-react';
+import { X, MessageSquare, Settings, Trash2, LogOut, Shield, ChevronDown } from 'lucide-react';
 import { getThemeClasses } from '@/lib/theme';
 import { SafeImage } from '@/components/ui/SafeImage';
 import type { Conversation, Theme } from '@/lib/types';
 import React from 'react';
+import { useRouter } from 'next/navigation';
 
 
 interface SidebarProps {
-  isOpen: boolean;
-  onClose: () => void;
-  conversations: Conversation[];
-  onNewConversation: () => void;
-  onSelectConversation: (id: string) => void;
-  onDeleteConversation: (id: string) => void;
-  currentConversationId: string | null;
-  onShowSettings: () => void;
-  theme: Theme;
+	isOpen: boolean;
+	onClose: () => void;
+	conversations: Conversation[];
+	onNewConversation: () => void;
+	onSelectConversation: (id: string) => void;
+	onDeleteConversation: (id: string) => void;
+	currentConversationId: string | null;
+	onShowSettings: () => void;
+	theme: Theme;
+	isAdmin: boolean;
+	handleLogout: () => void;
 }
 
 
 export function Sidebar({
-  isOpen,
-  onClose,
-  conversations,
-  onNewConversation,
-  onSelectConversation,
-  onDeleteConversation,
-  currentConversationId,
-  onShowSettings,
-  theme,
+	isOpen,
+	onClose,
+	conversations,
+	onNewConversation,
+	onSelectConversation,
+	onDeleteConversation,
+	currentConversationId,
+	onShowSettings,
+	theme,
+	isAdmin,
+	handleLogout,
 }: SidebarProps) {
-  const themeClasses = getThemeClasses(theme);
-  const [isMounted, setIsMounted] = useState(false);
-  const [deleteModal, setDeleteModal] = useState<{ show: boolean; conv: Conversation | null }>({
-    show: false,
-    conv: null
-  });
+	const themeClasses = getThemeClasses(theme);
+	const [isMounted, setIsMounted] = useState(false);
+	const [deleteModal, setDeleteModal] = useState<{ show: boolean; conv: Conversation | null }>({
+		show: false,
+		conv: null
+	});
+	const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+	const router = useRouter();
 
 
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+	useEffect(() => {
+		setIsMounted(true);
+	}, []);
+
+	useEffect(() => {
+		if (isOpen) {
+			document.body.style.overflow = 'hidden';
+		} else {
+			document.body.style.overflow = 'unset';
+		}
+
+		return () => {
+			document.body.style.overflow = 'unset';
+		};
+	}, [isOpen]);
+
+	// Close profile dropdown when clicking outside
+	useEffect(() => {
+		const handleClickOutside = (event: MouseEvent) => {
+			if (profileDropdownOpen) {
+				const target = event.target as Element;
+				if (!target.closest('.profile-dropdown')) {
+					setProfileDropdownOpen(false);
+				}
+			}
+		};
+
+		document.addEventListener('mousedown', handleClickOutside);
+		return () => document.removeEventListener('mousedown', handleClickOutside);
+	}, [profileDropdownOpen]);
 
 
-  const handleDeleteClick = (conv: Conversation) => {
-    setDeleteModal({ show: true, conv });
-  };
+	const handleDeleteClick = (conv: Conversation) => {
+		setDeleteModal({ show: true, conv });
+	};
 
 
-  const confirmDelete = () => {
-    if (deleteModal.conv) {
-      onDeleteConversation(deleteModal.conv.id);
-      setDeleteModal({ show: false, conv: null });
-    }
-  };
+	const confirmDelete = () => {
+		if (deleteModal.conv) {
+			onDeleteConversation(deleteModal.conv.id);
+			setDeleteModal({ show: false, conv: null });
+		}
+	};
 
 
-  const cancelDelete = () => {
-    setDeleteModal({ show: false, conv: null });
-  };
+	const cancelDelete = () => {
+		setDeleteModal({ show: false, conv: null });
+	};
 
 
-  if (!isMounted) return null;
+	if (!isMounted) return null;
 
 
-  return (
-    <>
-      <div
-        className={`fixed inset-y-0 left-0 z-50 w-80 shadow-xl transform transition-transform duration-300 ease-in-out ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
-        } border-r ${themeClasses.bgSecondary} ${themeClasses.border}`}
-      >
-        <div className="h-full flex flex-col">
-          {/* Header */}
-          <div className={`p-4 border-b ${themeClasses.border} flex items-center justify-between`}>
-            <div className="flex items-center gap-3">
-              <SafeImage src="/vb.png" alt="VB Logo" className="w-9 h-7 rounded-full" />
-              <div>
-                <h2 className={`font-semibold ${themeClasses.text}`}>VB Capital AI</h2>
-                <p className={`text-xs ${themeClasses.textMuted}`}>Virtual Assistant</p>
-              </div>
-            </div>
-            <button
-              onClick={onClose}
-              className={`p-2 rounded-lg transition-colors ${themeClasses.hoverSecondary}`}
-              aria-label="Close sidebar"
-            >
-              <X className={`w-5 h-5 ${themeClasses.textMuted}`} />
-            </button>
-          </div>
+	return (
+		<>
+			{/* Mobile backdrop overlay - only visible when sidebar is open on mobile */}
+			{isOpen && (
+				<div 
+					className="fixed inset-0 bg-black/50 z-40 md:hidden"
+					onClick={onClose}
+					aria-label="Close sidebar"
+				/>
+			)}
+			
+			<div
+				className={`fixed inset-0 left-0 z-50 w-80 shadow-xl transform transition-transform duration-300 ease-in-out md:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'
+					} border-r ${themeClasses.bgSecondary} ${themeClasses.border}`}
+			>
+				<div className="h-full flex flex-col">
+					{/* Enhanced Header - Now spans full sidebar width */}
+					<div className={`p-4 border-b ${themeClasses.border} flex flex-col gap-4 bg-gradient-to-b ${themeClasses.bgSecondary} to-transparent shadow-sm`}>
+						{/* Logo and Title Section */}
+						<div className="flex items-center gap-3">
+							<div className="p-2 rounded-lg bg-white/50 dark:bg-black/20 backdrop-blur-sm">
+								<SafeImage src="/vb.png" alt="VB Logo" className="w-9 h-7 rounded-full" />
+							</div>
+							<div>
+								<h2 className={`font-semibold ${themeClasses.text}`}>VB Capital AI</h2>
+								<p className={`text-xs ${themeClasses.textMuted}`}>Virtual Assistant</p>
+							</div>
+						</div>
+						
+						{/* Status and Actions Row */}
+						<div className="flex items-center justify-between">
+							<div className="flex items-center gap-2">
+								<div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+								<span className="text-xs text-green-600 font-medium">Online</span>
+							</div>
+							<button
+								onClick={onClose}
+								className={`p-2 rounded-lg transition-colors cursor-pointer ${themeClasses.hoverSecondary} md:hidden`}
+								aria-label="Close sidebar"
+							>
+								<X className={`w-5 h-5 ${themeClasses.textMuted}`} />
+							</button>
+						</div>
 
 
-          {/* New Chat Button */}
-          <div className="p-4">
-            <button
-              onClick={() => {
-                onNewConversation();
-                onClose();
-              }}
-              className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white py-3 px-4 rounded-xl font-medium flex items-center justify-center gap-2 transition-all duration-200 shadow-lg hover:shadow-xl"
-            >
-              <MessageSquare className="w-4 h-4" />
-              New Conversation
-            </button>
-          </div>
+					</div>
 
 
-          {/* Conversations List */}
-          <div className="flex-1 overflow-y-auto px-4">
-            {conversations.length > 0 ? (
-              <>
-                <h3 className={`text-sm font-medium mb-3 ${themeClasses.textMuted}`}>
-                  Recent Conversations
-                </h3>
-                <div className="space-y-2">
-                  {conversations.map((conv) => {
-                    const isActive = currentConversationId === conv.id;
+					{/* New Chat Button */}
+					<div className="p-4">
+						<button
+							onClick={() => {
+								onNewConversation();
+								onClose(); // Only closes on mobile
+							}}
+							className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white py-3 px-4 rounded-xl font-medium flex items-center justify-center gap-2 transition-all duration-200 shadow-lg hover:shadow-xl cursor-pointer"
+						>
+							<MessageSquare className="w-4 h-4" />
+							New Conversation
+						</button>
+					</div>
 
+					{/* Conversations Section */}
+					<div className="flex-1 overflow-y-auto">
+						<div className="px-4 pb-4">
+							<h3 className={`text-xs font-semibold uppercase tracking-wider mb-3 ${themeClasses.textMuted} px-2`}>
+								Conversations
+							</h3>
+							{conversations.length > 0 ? (
+								<div className="space-y-2">
+									{conversations.map((conv) => {
+										const isActive = currentConversationId === conv.id;
 
-                    return (
-                      <div
-                        key={conv.id}
-                        className={`
-                          group flex items-center justify-between p-3 rounded-lg transition-colors
-                          ${
-                            isActive
-                              ? 'bg-emerald-100 border border-emerald-600'
-                              : themeClasses.hover
-                          }
+										return (
+											<div
+												key={conv.id}
+												className={`
+                          group flex items-center justify-between p-3 rounded-lg transition-all duration-200
+                          ${isActive
+														? 'bg-gradient-to-r from-emerald-50 to-emerald-100 border border-emerald-200 shadow-sm'
+														: `${themeClasses.hover} hover:shadow-sm`
+													}
                         `}
-                      >
-                        <div
-                          className="flex-1 cursor-pointer"
-                          onClick={() => {
-                            onSelectConversation(conv.id);
-                            onClose();
-                          }}
-                        >
-                          {/* Title: darker when active */}
-                          <div
-                            className={`
+											>
+												<div
+													className="flex-1 cursor-pointer"
+													onClick={() => {
+														onSelectConversation(conv.id);
+														onClose(); // Only closes on mobile
+													}}
+												>
+													{/* Title: darker when active */}
+													<div
+														className={`
                               font-medium text-sm truncate
                               ${isActive ? 'text-emerald-900' : themeClasses.textSecondary}
                             `}
-                          >
-                            {conv.title}
-                          </div>
+													>
+														{conv.title}
+													</div>
 
-
-                          {/* Timestamp: darker when active */}
-                          <div
-                            className={`
+													{/* Timestamp: darker when active */}
+													<div
+														className={`
                               text-xs mt-1
                               ${isActive ? 'text-emerald-700' : themeClasses.textMuted}
                             `}
-                          >
-                            {conv.time}
-                          </div>
-                        </div>
+													>
+														{conv.time}
+													</div>
+												</div>
+
+												<button
+													onClick={() => handleDeleteClick(conv)}
+													className="ml-2 opacity-30 group-hover:opacity-100 text-gray-500 hover:text-red-700 transition cursor-pointer"
+													title="Delete"
+												>
+													<Trash2 className="w-4 h-4" />
+												</button>
+											</div>
+										);
+									})}
+								</div>
+							) : (
+								<div className={`text-center py-8 ${themeClasses.textMuted}`}>
+									<div className="text-4xl mb-2">💬</div>
+									<p className="text-sm">No conversations yet</p>
+									<p className="text-xs mt-1">Start chatting to see your history here</p>
+								</div>
+							)}
+						</div>
+					</div>
 
 
-                        <button
-                          onClick={() => handleDeleteClick(conv)}
-                          className="ml-2 opacity-30 group-hover:opacity-100 text-gray-500 hover:text-red-700 transition"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
-            ) : (
-              <div className={`text-center py-8 ${themeClasses.textMuted}`}>
-                No conversations yet
-              </div>
-            )}
-          </div>
 
 
-          {/* Settings */}
-          <div className={`p-4 border-t ${themeClasses.border}`}>
-            <button
-              onClick={() => {
-                onShowSettings();
-                onClose();
-              }}
-              className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors ${themeClasses.textMuted} ${themeClasses.hoverSecondary}`}
-            >
-              <Settings className="w-4 h-4" />
-              <span className="text-sm">Settings</span>
-            </button>
-          </div>
-        </div>
-      </div>
+					{/* Profile Dropdown Footer */}
+					<div className={`p-4 border-t ${themeClasses.border}`}>
+						<div className="relative">
+							<button
+								onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+								className="w-full flex items-center justify-center gap-2 p-3 rounded-lg transition-colors cursor-pointer hover:bg-white/10 dark:hover:bg-black/10"
+							>
+								<div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center">
+									<span className="text-white text-sm font-medium">U</span>
+								</div>
+								<ChevronDown className={`w-4 h-4 ${themeClasses.textMuted} transition-transform duration-200 ${profileDropdownOpen ? 'rotate-180' : ''}`} />
+							</button>
+
+							{/* Profile Dropdown Menu */}
+							{profileDropdownOpen && (
+								<div className={`absolute bottom-full left-0 right-0 mb-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg border ${themeClasses.border} z-10 profile-dropdown`}>
+									<div className="p-3 border-b border-gray-200 dark:border-gray-700">
+										<div className="flex items-center gap-3">
+											<div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center">
+												<span className="text-white text-sm font-medium">U</span>
+											</div>
+											<div>
+												<p className={`text-sm font-semibold ${themeClasses.text}`}>
+													{isAdmin ? 'Administrator' : 'User'}
+												</p>
+												<p className={`text-xs ${themeClasses.textMuted}`}>
+													{isAdmin ? 'Full Access' : 'Standard Access'}
+												</p>
+											</div>
+										</div>
+									</div>
+									
+									<div className="p-2 space-y-1">
+										{/* Settings */}
+										<button
+											onClick={() => {
+												onShowSettings();
+												setProfileDropdownOpen(false);
+												onClose(); // Only closes on mobile
+											}}
+											className={`w-full flex items-center gap-3 p-2 rounded-lg transition-colors cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${themeClasses.text}`}
+										>
+											<Settings className="w-4 h-4" />
+											<span className="text-sm">Settings</span>
+										</button>
+
+										{/* Admin Panel */}
+										{isAdmin && (
+											<button
+												onClick={() => {
+													router.push('/admin');
+													setProfileDropdownOpen(false);
+													onClose(); // Close sidebar on mobile
+												}}
+												className={`w-full flex items-center gap-3 p-2 rounded-lg transition-colors cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${themeClasses.text}`}
+											>
+												<Shield className="w-4 h-4" />
+												<span className="text-sm">Admin Panel</span>
+											</button>
+										)}
+
+										{/* Logout */}
+										<button
+											onClick={() => {
+												handleLogout();
+												setProfileDropdownOpen(false);
+												onClose(); // Close sidebar on mobile
+											}}
+											className="w-full flex items-center gap-3 p-2 rounded-lg transition-colors cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400"
+										>
+											<LogOut className="w-4 h-4" />
+											<span className="text-sm">Logout</span>
+										</button>
+									</div>
+								</div>
+							)}
+						</div>
+					</div>
+				</div>
+			</div>
 
 
-      {/* Simple Delete Modal */}
-      {deleteModal.show && deleteModal.conv && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
-          <div className={`rounded-lg shadow-lg max-w-sm w-full p-6 ${themeClasses.cardBg}`}>
-            <h3 className={`text-lg font-medium mb-3 ${themeClasses.text}`}>
-              Delete conversation?
-            </h3>
-            <p className={`text-sm mb-6 ${themeClasses.textSecondary}`}>
-              This action cannot be undone.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={cancelDelete}
-                className={`flex-1 px-4 py-2 rounded-lg border text-black ${themeClasses.buttonSecondary}`}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmDelete}
-                className="flex-1 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
+			{/* Simple Delete Modal */}
+			{deleteModal.show && deleteModal.conv && (
+				<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+					<div className={`rounded-lg shadow-lg max-w-sm w-full p-6 ${themeClasses.cardBg}`}>
+						<h3 className={`text-lg font-medium mb-3 ${themeClasses.text}`}>
+							Delete conversation?
+						</h3>
+						<p className={`text-sm mb-6 ${themeClasses.textSecondary}`}>
+							This action cannot be undone.
+						</p>
+						<div className="flex gap-3">
+							<button
+								onClick={cancelDelete}
+								className={`flex-1 px-4 py-2 rounded-lg border text-black cursor-pointer ${themeClasses.buttonSecondary}`}
+							>
+								Cancel
+							</button>
+							<button
+								onClick={confirmDelete}
+								className="flex-1 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white cursor-pointer"
+							>
+								Delete
+							</button>
+						</div>
+					</div>
+				</div>
+			)}
+		</>
+	);
 }
-

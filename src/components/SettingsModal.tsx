@@ -27,7 +27,7 @@ export function SettingsModal({ isOpen, onClose, theme, onThemeChange }: Setting
           <h2 className="text-xl font-semibold">Settings</h2>
           <button
             onClick={onClose}
-            className={`p-2 rounded-lg transition-colors ${themeClasses.hoverSecondary}`}
+            className={`p-2 rounded-lg transition-colors cursor-pointer ${themeClasses.hoverSecondary}`}
           >
             <X className={`w-5 h-5 ${themeClasses.textMuted}`} />
           </button>
@@ -63,13 +63,13 @@ export function SettingsModal({ isOpen, onClose, theme, onThemeChange }: Setting
         <div className="mt-6 flex gap-3">
           <button
             onClick={onClose}
-            className={`flex-1 px-4 py-2 rounded-lg transition-colors ${themeClasses.bgTertiary} ${themeClasses.textSecondary} ${themeClasses.hoverSecondary}`}
+            className={`flex-1 px-4 py-2 rounded-lg transition-colors cursor-pointer ${themeClasses.bgTertiary} ${themeClasses.textSecondary} ${themeClasses.hoverSecondary}`}
           >
             Cancel
           </button>
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+            className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors cursor-pointer"
           >
             Save Changes
           </button>

@@ -174,7 +174,7 @@ export default function SignInPage() {
         <div className="relative">
           <button
             onClick={() => setShowThemeSelector(!showThemeSelector)}
-            className={`p-3 rounded-lg transition-colors ${themeClasses.bgSecondary} ${themeClasses.border} border ${themeClasses.hoverSecondary}`}
+            className={`p-3 rounded-lg transition-colors cursor-pointer ${themeClasses.bgSecondary} ${themeClasses.border} border ${themeClasses.hoverSecondary}`}
             title="Change Theme"
           >
             <Settings className={`w-5 h-5 ${themeClasses.textMuted}`} />
@@ -186,7 +186,7 @@ export default function SignInPage() {
                 <button
                   key={t}
                   onClick={() => handleThemeChange(t as Theme)}
-                  className={`w-full text-left px-4 py-2 text-sm transition-colors ${
+                  className={`w-full text-left px-4 py-2 text-sm transition-colors cursor-pointer ${
                     theme === t
                       ? 'bg-emerald-500 text-white'
                       : `${themeClasses.textSecondary} ${themeClasses.hoverSecondary}`
@@ -290,7 +290,7 @@ export default function SignInPage() {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className={`absolute right-3 top-1/2 transform -translate-y-1/2 p-1 rounded transition-colors ${themeClasses.textMuted} ${themeClasses.hoverSecondary}`}
+                    className={`absolute right-3 top-1/2 transform -translate-y-1/2 p-1 rounded transition-colors cursor-pointer ${themeClasses.textMuted} ${themeClasses.hoverSecondary}`}
                     disabled={isLoading}
                   >
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -301,7 +301,7 @@ export default function SignInPage() {
               <button
                 onClick={handleSubmit}
                 disabled={isLoading || !userId.trim() || !password.trim()}
-                className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 disabled:from-gray-300 disabled:to-gray-400 text-white py-3 px-4 rounded-lg font-medium transition-all duration-200 shadow-lg hover:shadow-xl disabled:shadow-none flex items-center justify-center"
+                className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 disabled:from-gray-300 disabled:to-gray-400 text-white py-3 px-4 rounded-lg font-medium transition-all duration-200 shadow-lg hover:shadow-xl disabled:shadow-none flex items-center justify-center cursor-pointer"
               >
                 {isLoading ? (
                   <div className="flex items-center gap-2">

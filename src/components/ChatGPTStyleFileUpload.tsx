@@ -149,7 +149,7 @@ export const ChatGPTStyleFileUpload: React.FC<ChatGPTStyleFileUploadProps> = ({
               {onRemoveFile && (
                 <button
                   onClick={() => onRemoveFile(index)}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-red-500 hover:text-red-600"
+                  className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg text-red-500 hover:text-red-600 cursor-pointer"
                   title="Remove file"
                 >
                   <X className="w-4 h-4" />
@@ -179,7 +179,7 @@ export const ChatGPTStyleFileUpload: React.FC<ChatGPTStyleFileUploadProps> = ({
             absolute right-3 top-1/2 transform -translate-y-1/2 p-1.5 rounded-lg transition-colors
             ${disabled 
               ? 'text-gray-300 cursor-not-allowed' 
-              : `${themeClasses.textMuted} hover:${themeClasses.text} hover:bg-gray-100 dark:hover:bg-gray-700`
+              : `${themeClasses.textMuted} hover:${themeClasses.text} hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer`
             }
           `}
           title="Attach files"
@@ -195,7 +195,7 @@ export const ChatGPTStyleFileUpload: React.FC<ChatGPTStyleFileUploadProps> = ({
             p-2 rounded-lg transition-colors ${className}
             ${disabled 
               ? 'text-gray-300 cursor-not-allowed' 
-              : `${themeClasses.textMuted} hover:${themeClasses.text} hover:bg-gray-100 dark:hover:bg-gray-800`
+              : `${themeClasses.textMuted} hover:${themeClasses.text} hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer`
             }
           `}
           title="Attach files"

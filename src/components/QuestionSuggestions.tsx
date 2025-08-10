@@ -52,7 +52,7 @@ export function QuestionSuggestions({ onSelectQuestion, conversations, theme }: 
           <button
             key={index}
             onClick={() => onSelectQuestion(suggestion)}
-            className={`text-left p-3 border rounded-lg transition-all duration-200 text-sm ${themeClasses.bgSecondary} ${themeClasses.border} hover:bg-emerald-900 hover:border-emerald-600 ${themeClasses.textSecondary} hover:text-emerald-300`}
+            className={`text-left p-3 border rounded-lg transition-all duration-200 text-sm cursor-pointer ${themeClasses.bgSecondary} ${themeClasses.border} hover:bg-emerald-900 hover:border-emerald-600 ${themeClasses.textSecondary} hover:text-emerald-300`}
           >
             <div className="flex items-start gap-2">
               <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full mt-2 flex-shrink-0"></div>
