@@ -216,7 +216,7 @@ export function ChatMessage({ message, theme, onFeedback }: ChatMessageProps) {
     <div className={`flex gap-4 mb-6 ${isAssistant ? 'justify-start' : 'justify-end'}`}>
       {isAssistant && (
         <SafeImage
-          src="/vb.png"
+          src="/logo_b.svg"
           alt="VB Logo"
           className="w-9 h-7 rounded-full"
           fallback={<div className="w-9 h-7 bg-gray-200 rounded-full" />}

@@ -12,7 +12,7 @@ export function TypingIndicator({ theme }: { theme: Theme }) {
     <div className="flex gap-4 mb-6">
       <div>
         <SafeImage
-          src="/vb.png"
+          src="/logo_b.svg"
           alt="VB Logo"
           className="w-9 h-7 rounded-full"
         />
